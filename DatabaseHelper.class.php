@@ -158,7 +158,13 @@ class DatabaseHelper
         return '';
     }
 
-
+    public function rowById($table, $id)
+	{
+		$sql = 'SELECT * FROM `'.$this->cleanIdentifier($table).'` WHERE `'.$this->cleanIdentifier($this->settings['id_field_name']).'` = :id_field;';
+        $binds = array(':id'=>$id);
+		$return_value = $this->makeQuery($sql, 'row', $binds);
+		return $this->lastInsertId;
+	}
 
 
     // execute SQL when no result values are needed
@@ -179,23 +185,13 @@ class DatabaseHelper
 		return $str;
 	}*/
 
-    public function cleanString($str)
+    /**
+     * Clean a database identifier such as a table or field name
+     * by removing characters other than letters, numbers, and underscores.
+     */
+    private function cleanIdentifier($identifier)
     {
-        // note - add this back if needed
-
-        /*$valid = 'abcdefghijklmnopqrstuvwxyz01234567890_';*/
-
-        $return_str = $str;
-        /*$len = strlen($str);
-		for ($x=0; $x<$len; $x++)
-		{
-			$char = substr($str,$x,1);
-			if (stripos($valid,$char)!==false)
-			{
-				$return_str.= $char;
-			}
-		}*/
-        return $return_str;
+        return preg_replace('/[^a-zA-Z0-9_]/', '', $identifier);
     }
 
     // prepare and execute SQL
@@ -228,7 +224,7 @@ class DatabaseHelper
         }
 
         foreach ($binds as $field => $value) {
-            $field = ':' . $this->cleanString($field);
+            $field = ':' . $this->cleanIdentifier($field);
             $statement->bindValue($field, $value);
             if (!$statement) {
                 //$this->set_con_error();
@@ -281,18 +277,21 @@ class DatabaseHelper
 
     public function display($value)
     {
-        echo "\n<style>" .
-            "pre.db_class_preview1 {}" .
-            "table.db_class_preview1 {}" .
-            "</style>\n";
+       
 
         if (!is_array($value)) {
+             echo "\n<style>" .
+            "pre.db_class_preview1 {}" .
+            "</style>\n";
             echo "\n<pre class=\"db_class_preview1\">";
             var_dump($value);
             echo "</pre>\n";
             return;
         }
 
+        echo "\n<style>" .
+            "pre.db_class_preview1 {}" .
+            "</style>\n";
         echo "\n<table class=\"db_class_preview1\">\n";
 
         $is2DArray = false;
