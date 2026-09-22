@@ -43,7 +43,15 @@ class DatabaseHelper
         // used by all "ById" functions find a record by id
         // for instance, if this is set to "id", then 
         //  getRowById('users', 12) will run the query "select * from users where id=12;"
-        'id_field_name' => 'id'
+        'id_field_name' => 'id',
+
+        // the maximum number of rows inserted per query
+        // used by the insertMultiple and insertMultipleFieldsValues functions
+        // higher values will be more efficient (fewer queries), but may increase memory usage
+        //     and the chance of exceeding database or connection limits
+        // the default (100) is a very conservative value; values in the tens of thousands
+        //     will likely work fine for typical data
+        'max_rows_per_insert_multiple_query' => 100
     );
 
 
@@ -88,6 +96,11 @@ class DatabaseHelper
     // The Constructor
     public function __construct($dbName, $host, $user, $pass)
     {
+        $dbName = $this->checkIdentifier($dbName, 'table');
+        if (empty($dbName)) {
+            return false;
+        }
+
         $opt = array(
             PDO::ATTR_ERRMODE            => PDO::ERRMODE_SILENT,
             PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC,
@@ -135,7 +148,7 @@ class DatabaseHelper
             return $return_value;
         }
         return array();
-    }    
+    }
 
     // shortcut for the column function
     public function col($sql, $binds = array(), $flags = array())
@@ -158,22 +171,303 @@ class DatabaseHelper
         return '';
     }
 
-    public function rowById($table, $id)
-	{
-		$sql = 'SELECT * FROM `'.$this->cleanIdentifier($table).'` WHERE `'.$this->cleanIdentifier($this->settings['id_field_name']).'` = :id_field;';
-        $binds = array(':id'=>$id);
-		$return_value = $this->makeQuery($sql, 'row', $binds);
-		return $this->lastInsertId;
-	}
-
-
-    // execute SQL when no result values are needed
-    // generally only needed for delete or update
-    // returns null if the query fails (invalid queries only, valid queries with no results are success)
-    public function query($sql, $binds = array(), $flags = array())
+    /**
+     * insert a record into the database
+     * fields is an array of key/value pairs where the key is the field name
+     */
+    public function insert($table, $fields)
     {
-        return $this->makeQuery($sql, 'isSuccess', $binds, $flags);
+        $table = $this->checkIdentifier($table, 'table');
+        if (empty($table)) {
+            return 0;
+        }
+
+        if (!is_array($fields)) {
+            $this->exitProgramError('class', 'fields passed to insert are not an array');
+            return 0;
+        }
+        if (count($fields) < 1) {
+            $this->exitProgramError('class', 'empty array of fields (0 fields) were passed to insert function');
+            return false;
+        }
+
+        $fieldStr = $valueStr = '';
+        $binds = array();
+        $sep = '';
+        foreach ($fields as $field => $value) {
+            $fieldClean = $this->checkIdentifier($field, 'field');
+            if (empty($fieldClean)) {
+                return 0;
+            }
+            $fieldStr .= $sep . '`' . $fieldClean . '`';
+            $valueStr .= $sep . ':' . $fieldClean;
+            $binds[':' . $fieldClean] = $value;
+            $sep = ', ';
+        }
+        $sql = 'INSERT INTO `' . $table . '` (' . $fieldStr . ') VALUES (' . $valueStr . ');';
+        $this->makeQuery($sql, 'query', $binds);
+        return $this->lastInsertId;
     }
+
+
+    public function insertMultiple($table, $rows)
+    {
+        $table = $this->checkIdentifier($table, 'table');
+        if (empty($table)) {
+            return false;
+        }
+
+        if (!is_array($rows)) {
+            $this->exitProgramError('class', 'rows passed to InsertMultiple are not an array');
+            return false;
+        }
+        if (count($rows) < 1) {
+            $this->exitProgramError('class', 'empty array of rows (0 rows) were passed to InsertMultiple function');
+            return false;
+        }
+
+        // pre-check all rows
+
+        $matchRow = array();
+        $rowKeys = array();
+        foreach ($rows as $row) {
+            if (!is_array($row)) {
+                $this->exitProgramError('class', '$rows passed to insertMultiple must be a 2 dimensional array');
+                return false;
+            }
+
+            if (empty($matchRow)) {
+                // our first row that we will use to compare to others has not been set yet
+                // do some validation and set it
+
+                if (count($row) < 1) {
+                    $this->exitProgramError('class', 'the first row of $rows is empty (0 fields) in the InsertMultiple function');
+                    return false;
+                }
+
+                foreach ($row as $field => $value) {
+                    $fieldClean = $this->checkIdentifier($field, 'field');
+                    if (empty($fieldClean)) {
+                        return false;
+                    }
+                }
+
+                // $matchRow will be compared with every other row, in these checks keys must be the same
+                $matchRow = $row;
+                $rowKeys = array_keys($matchRow);
+            } else {
+                if (array_diff_key($matchRow, $row) || array_diff_key($row, $matchRow)) {
+                    $this->exitProgramError('class', 'mismatched field names (array keys) in InsertMultiple');
+                    return false;
+                }
+            }
+        }
+
+        $fieldStr = '';
+        foreach ($rowKeys as $key) {
+            if (!empty($fieldStr)) {
+                $fieldStr .= ',';
+            }
+            $fieldStr .= '`' . $key . '`';
+        }
+
+        $maxInsertRows = $this->settings['max_rows_per_insert_multiple_query'];
+
+        $valStr = '';
+        $binds = array();
+        $ctr = 0;
+        $isFirstRow = true;
+        foreach ($rows as $row) {
+            $ctr++;
+            if ($isFirstRow) {
+                $isFirstRow = false;
+            } else {
+                $valStr .= ',';
+            }
+
+            $isFirstField = true;
+            $valStr .= '(';
+            foreach ($rowKeys as $field) {
+                if ($isFirstField) {
+                    $isFirstField = false;
+                } else {
+                    $valStr .= ',';
+                }
+                $bindKey = ':' . $field . '_' . $ctr;
+                $valStr .= $bindKey;
+                $binds[$bindKey] = $row[$field];
+            }
+            $valStr .= ')';
+
+            if ($ctr >= $maxInsertRows) {
+                $sql = "insert into `" . $table . "` (" . $fieldStr . ") values " . $valStr . ";";
+                $returnValue = $this->makeQuery($sql, 'query', $binds);
+                if (!$returnValue) {
+                    return false;
+                }
+                $isFirstRow = true;
+                $valStr = '';
+                $binds = array();
+                $ctr = 0;
+            }
+        }
+
+        if (!empty($valStr)) {
+            $sql = "insert into `" . $table . "` (" . $fieldStr . ") values " . $valStr . ";";
+            $returnValue = $this->makeQuery($sql, 'query', $binds);
+            if (!$returnValue) {
+                return false;
+            }
+        }
+
+        return true;
+    }
+
+    public function insertMultipleFieldsValues($table, $fields, $dataRows)
+    {
+        $table = $this->checkIdentifier($table, 'table');
+        if (empty($table)) {
+            return false;
+        }
+
+        if (!is_array($fields)) {
+            $this->exitProgramError('class', 'fields passed to insertMultipleFieldsValues are not an array');
+            return false;
+        }
+        $fieldCount = count($fields);
+        if ($fieldCount < 1) {
+            $this->exitProgramError('class', 'empty array of fields (0 fields) were passed to insertMultipleFieldsValues function');
+            return false;
+        }
+
+        if (!is_array($dataRows)) {
+            $this->exitProgramError('class', 'dataRows passed to insertMultipleFieldsValues are not an array');
+            return false;
+        }
+        if (count($dataRows) < 1) {
+            $this->exitProgramError('class', 'empty array of dataRows (0 rows) were passed to insertMultipleFieldsValues function');
+            return false;
+        }
+
+        // pre-check all rows
+
+
+        $rowKeys = array();
+        foreach ($dataRows as $row) {
+            if (!is_array($row)) {
+                $this->exitProgramError('class', '$dataRows passed to insertMultipleFieldsValues must be a 2 dimensional array');
+                return false;
+            }
+
+            if ($fieldCount !== count($row)) {
+                $this->exitProgramError('class', 'mismatched field names (array keys) in InsertMultiple');
+                return false;
+            }
+        }
+
+        $fieldStr = '';
+        foreach ($fields as $field) {
+            $table = $this->checkIdentifier($field, 'field');
+            if (empty($field)) {
+                return false;
+            }
+
+            if (!empty($fieldStr)) {
+                $fieldStr .= ',';
+            }
+            $fieldStr .= '`' . $field . '`';
+        }
+
+        $maxInsertRows = $this->settings['max_rows_per_insert_multiple_query'];
+
+        $valStr = '';
+        $binds = array();
+        $ctr = 0;
+        $isFirstRow = true;
+        foreach ($dataRows as $row) {
+            $ctr++;
+            if ($isFirstRow) {
+                $isFirstRow = false;
+            } else {
+                $valStr .= ',';
+            }
+
+            $isFirstField = true;
+            $valStr .= '(';
+            $valCtr = 0;
+            foreach ($row as $value) {
+                if ($isFirstRow) {
+                    $isFirstField = false;
+                } else {
+                    $valStr .= ',';
+                }
+                $valCtr++;
+                $bindKey = ':v_' . $ctr . '_' . $valCtr;
+                $valStr .= $bindKey;
+                $binds[$bindKey] = $value;
+            }
+            $valStr .= ')';
+
+            if ($ctr >= $maxInsertRows) {
+                $sql = "insert into `" . $table . "` (" . $fieldStr . ") values " . $valStr . ";";
+                $returnValue = $this->makeQuery($sql, 'query', $binds);
+                if (!$returnValue) {
+                    return false;
+                }
+                $isFirstRow = true;
+                $valStr = '';
+                $binds = array();
+                $ctr = 0;
+            }
+        }
+
+        if (!empty($valStr)) {
+            $sql = "insert into `" . $table . "` (" . $fieldStr . ") values " . $valStr . ";";
+            $returnValue = $this->makeQuery($sql, 'query', $binds);
+            if (!$returnValue) {
+                return false;
+            }
+        }
+
+        return true;
+    }
+
+    /**
+     * get a row by the identifier (usually "id")
+     * only supports simple "select [id] from table where id=[id]" queries
+     */
+    public function rowById($table, $id)
+    {
+        $table = $this->checkIdentifier($table, 'table');
+        $idFieldName = $this->checkIdentifier($this->settings['id_field_name'], 'id field');
+        if (empty($table) || empty($idFieldName)) {
+            return array();
+        }
+
+        $sql = 'SELECT * FROM `' . $table . '` WHERE `' . $idFieldName . '` = :id limit 1;';
+        $binds = array(':id' => $id);
+        return $this->row($sql, $binds);
+    }
+
+    /**
+     * get a single field value by the identifier (usually "id")
+     * only supports simple "select [id] from table where id=[id]" queries
+     */
+    public function oneById($table, $id, $field)
+    {
+        $table = $this->checkIdentifier($table, 'table');
+        $idFieldName = $this->checkIdentifier($this->settings['id_field_name'], 'id field');
+        $field = $this->checkIdentifier($field, 'field');
+        if (empty($table) || empty($idFieldName) || empty($field)) {
+            return '';
+        }
+
+        $sql = 'SELECT `' . $field . '` FROM `' . $table . '` WHERE `' . $idFieldName . '` = :id LIMIT 1;';
+        $binds = array(':id' => $id);
+        return $this->one($sql, $binds);
+    }
+
+
 
 
     /*public function esc($str)
@@ -186,17 +480,31 @@ class DatabaseHelper
 	}*/
 
     /**
-     * Clean a database identifier such as a table or field name
-     * by removing characters other than letters, numbers, and underscores.
+     * check a database identifier such as a table or field name
+     * should only be letters, numbers, and underscores.
+     * if invalid, produce a class error (will end the program depending on settings)
+     * if invalid and the program settings do not end the program on error, return an empty string.
      */
-    private function cleanIdentifier($identifier)
+    private function checkIdentifier($identifier, $type)
     {
-        return preg_replace('/[^a-zA-Z0-9_]/', '', $identifier);
+        if (empty($identifier)) {
+            $message = 'empty ' . $type . ' name';
+            $this->exitProgramError('class', $message);
+            return '';
+        }
+
+        if (!preg_match('/^[a-zA-Z_][a-zA-Z0-9_]*$/', $identifier)) {
+            $message = 'invalid ' . $type . ' name: ' . $identifier
+                . ' | must be only letters, numbers, and underscores and cannot start with a number';
+            $this->exitProgramError('class', $message);
+            return '';
+        }
+        return $identifier;
     }
 
     // prepare and execute SQL
     // used internally by the public methods process queries
-    private function makeQuery($sql, $type, $binds, $flags)
+    private function makeQuery($sql, $type, $binds = array(), $flags = array())
     {
         // convert any falsey value to an empty array. this way a user can pass null
         if (empty($binds)) {
@@ -224,7 +532,7 @@ class DatabaseHelper
         }
 
         foreach ($binds as $field => $value) {
-            $field = ':' . $this->cleanIdentifier($field);
+            $field = ':' . $this->checkIdentifier($field, 'field');
             $statement->bindValue($field, $value);
             if (!$statement) {
                 //$this->set_con_error();
@@ -277,12 +585,12 @@ class DatabaseHelper
 
     public function display($value)
     {
-       
+
 
         if (!is_array($value)) {
-             echo "\n<style>" .
-            "pre.db_class_preview1 {}" .
-            "</style>\n";
+            echo "\n<style>" .
+                "pre.db_class_preview1 {}" .
+                "</style>\n";
             echo "\n<pre class=\"db_class_preview1\">";
             var_dump($value);
             echo "</pre>\n";
