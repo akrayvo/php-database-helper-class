@@ -1,0 +1,110 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Database Helper Examples - Basic</title>
+    <link rel="stylesheet" href="./style.css?z=1">
+</head>
+
+<body>
+    <h1>Examples - Basic</h1>
+    <div><a href="./">&laquo; back to All Examples</a></div><br><br>
+
+    <h2>include the class file and initialize</h2>
+
+    
+<code>
+// include the class file
+require_once('../DatabaseHelper.class.php');
+// initialize class
+$db = new DatabaseHelper(
+    "your_db",          // db name
+    "127.0.0.1",        // host
+    "your_username",    // user
+    "your_password"     // password
+);
+</code>
+
+    <br><br>
+
+    <h2>Get all user records sorted alphabetically</h2>
+<code>
+$customers = $db->all('select * from customers order by last_name, first_name;');
+</code>
+
+    <br><br><br>
+
+    <h2>Get information on the last query</h2>
+<code>
+// display information about the last query, such as the SQL, errors, duration, etc
+$db->info();
+// display the value of the variable for debugging
+// works especially well for displaying a 2-dimensional array with matching keys as a table
+$db->display($customers);
+</code>
+
+    <br><br><br>
+
+    
+
+    <h2>Get all user records sorted alphabetically</h2>
+<code>
+$customers = $db->all('select * from customers order by last_name, first_name;');
+</code>
+
+    <br><br><br>    
+
+    <h2>Get all info for the first user sorted alphabetically</h2>
+<code>
+$customers = $db->row('select * from customers order by last_name, first_name limit 1;');
+</code>
+
+
+    <br><br><br>
+
+    <h2>Get the last name only for the first user sorted alphabetically</h2>
+    
+<code>
+$lastName = $db->one('select last_name from customers order by last_name, first_name limit 1;');
+</code>
+
+
+    <br><br><br>
+
+    <h2>Insert, Update, and Delete</h2>
+<br>
+    <h3>Insert</h3>
+<code>
+$values = array('first_name'=>'Bob', 'last_name'=>'Jones');
+$insertId = $db->insert('customers', $values);
+</code>
+
+    <br><br>
+
+    <h3>Update first name of the newly added customer using the update function</h3>
+<code>
+$values = array('first_name' => 'Robert');
+$isSuccess = $db->update('customers', $values, 'id=:id', array(':id' => $insertId));
+</code>
+
+<br><br>
+
+    <h3>Update last name of the newly added customer using the updateById function</h3>
+<code>
+$values = array('last_name' => 'Johnson');
+$isSuccess = $db->updateById('customers', $values, $insertId);
+</code>
+
+<br><br>
+
+    <h3>Delete the newly added record</h3>
+<code>
+$isSuccess = $db->deleteById('customers', $insertId);
+</code>
+
+
+</body>
+
+</html>

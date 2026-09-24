@@ -14,8 +14,12 @@ body {
 
 body,
 h1,
-h2
-input {
+h2,
+h3,
+input,
+td, 
+td,
+textarea {
   font-family: Arial, 'Helvetica Neue', Helvetica, sans-serif;
   font-size: 14px;
 }
@@ -29,6 +33,13 @@ h1 {
 
 h2 {
   font-size: 20px;
+  margin: 0;
+  padding: 0 0 4px 0;
+  font-weight: bold;
+}
+
+h3 {
+  font-size: 18px;
   margin: 0;
   padding: 0 0 4px 0;
   font-weight: bold;
@@ -53,8 +64,8 @@ textarea {
   max-width: 260px;
 }
 
-input[type="radio"], 
-input[type="checkbox"] {
+input[type='radio'],
+input[type='checkbox'] {
   width: auto;
 }
 
@@ -112,9 +123,10 @@ table {
   border-collapse: collapse;
 }
 
-table td, table th {
+table td,
+table th {
   padding: 10px;
-  border: 1px solid #AAA;
+  border: 1px solid #aaa;
 }
 
 ul {
@@ -124,7 +136,7 @@ ul {
 }
 
 ul ul {
-  margin-left:20px;
+  margin-left: 20px;
 }
 
 .section-label {
@@ -132,5 +144,11 @@ ul ul {
 }
 
 div {
-  margin-bottom:6px;
+  margin-bottom: 6px;
+}
+
+code {
+  display: block;
+  white-space: pre;       /* Preserves spaces, tabs, and line breaks */
+  font-family: monospace;
 }
