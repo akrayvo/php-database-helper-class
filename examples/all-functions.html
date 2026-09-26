@@ -5,7 +5,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Database Helper Examples - All Functions</title>
-    <link rel="stylesheet" href="./style.css?z=1">
+    <link rel="stylesheet" href="./style.css">
 </head>
 
 <body>
@@ -37,7 +37,7 @@ $db = new DatabaseHelper(
     </ul>
 <code>
 $db->updateSetting('save_last_query_info', true);
-$db->updateSetting('output_errors', "An Error Occurred")->updateSetting('error_output_text', true);
+$db->updateSetting('output_errors', "An Error Occurred")->updateSetting('error_output_html', true);
 </code>
 
     <br><br><br>
@@ -60,7 +60,7 @@ $db->query('delete from customers where last_name = :last_name;', array(':last_n
     <ul>
         <li>execute SQL and return all result rows</li>
         <li>returns a 2-dimensional array, with each row as an associative key/value array</li>
-        <li>optionally use $keyField to use a field as the key of the main array</li>
+        <li>optionally use $keyField to use a field as the array key. * note that array keys are required and unique, so null or duplicate values may result in rows being overwritten or omitted.</li>
     </ul>
 <code>
 $customers = $db->all('select * from customers where last_name = :last_name;', array(':last_name' => 'Jones'), 'id'); 
@@ -73,7 +73,6 @@ $customers = $db->all('select * from customers where last_name = :last_name;', a
     <ul>
         <li>execute SQL and return the first result row</li>
         <li>returns a 1-dimensional associative array containing the row's fields and values</li>
-        <li>optionally use $keyField to use a field as the key of the main array</li>
     </ul>
 <code>
 $customer = $db->row('select * from customers where last_name = :last_name order by first_name limit 1;', array(':last_name' => 'Jones')); 
@@ -101,7 +100,7 @@ $customer = $db->rowById('customers', 25);
     <h2>column($sql, $binds = array(), $keyField = '', $valueField = '')</h2>
     <ul>
         <li>execute SQL and return all values from a single column</li>
-        <li>optionally use $keyField to use a field as the array key</li>
+        <li>optionally use $keyField to use a field as the array key. * note that array keys are required and unique, so null or duplicate values may result in rows being overwritten or omitted.</li>
         <li>optionally use $valueField to specify which field's values to return</li>
     </ul>
 <code>
@@ -212,15 +211,15 @@ $isSuccess = $db->insertMultipleFieldsValues(
 
     <br><br><br>
 
-    <h2>update($table, $values, $where, $whereBinds = array())</h2>
+    <h2>update($table, $values, $whereSql, $whereBinds = array())</h2>
     <ul>
         <li>update rows in a table</li>
         <li>returns true if the query succeeds and false if it fails</li>
         <li>uses $values to specify the fields and values to update</li>
-        <li>uses $where to specify which rows to update</li>
-        <li>$where is required to avoid mistakes; if all rows need to be updated, set $where to "true" to match all
+        <li>uses $whereSql to specify which rows to update</li>
+        <li>$whereSql is required to avoid mistakes; if all rows need to be updated, set $whereSql to "true" to match all
             rows.</li>
-        <li>optionally use $whereBinds to bind values to the $where statement</li>
+        <li>optionally use $whereBinds to bind values to the $whereSql statement</li>
     </ul>
 <code>
 $isSuccess = $db->update('customers', array('first_name' => 'John'), 'last_name = :last_name', array(':last_name' => 'Jones'));
@@ -243,14 +242,13 @@ $isSuccess = $db->updateById('customers', array('first_name' => 'John'), 25);
 
     <br><br><br>
 
-    <h2>delete($table, $where, $whereBinds = array())</h2>
+    <h2>delete($table, $whereSql, $whereBinds = array())</h2>
     <ul>
         <li>delete rows from a table</li>
         <li>returns true if the query succeeds and false if it fails</li>
-        <li>uses $where to specify which rows to delete</li>
-        <li></li>$where is required to avoid mistakes; if all rows need to be updated, set $where to "true" to match all
-        rows.</li>
-        <li>optionally use $whereBinds to bind values to the $where statement</li>
+        <li>uses $whereSql to specify which rows to delete</li>
+        <li>$whereSql is required to avoid mistakes; if all rows need to be updated, set $whereSql to "true" to match all rows.</li>
+        <li>optionally use $whereBinds to bind values to the $whereSql statement</li>
     </ul>
 <code>
 $isSuccess = $db->delete('customers', 'last_name = :last_name', array(':last_name' => 'Jones'));
@@ -274,47 +272,47 @@ $isSuccess = $db->deleteById('customers', 25);
     <br><br><br>
 
 
-    <h2>getLastRowCount()</h2>
+    <h2>lastRowCount()</h2>
     <ul>
         <li>get the number of rows affected by the last query</li>
     </ul>
 <code>
-$rowCount = $db->getLastRowCount();
+$rowCount = $db->lastRowCount();
 </code>
 
 
     <br><br><br>
 
-    <h2>getLastInsertId()</h2>
+    <h2>lastInsertId()</h2>
     <ul>
         <li>get the identifier of the last query</li>
         <li>will be 0 unless the last query was a successful insert</li>
     </ul>
 <code>
- $id = $db->getLastInsertId();
+ $id = $db->lastInsertId();
 </code>
 
     <br><br><br>
 
-    <h2>getLastQuery()</h2>
+    <h2>lastQueryInfo()</h2>
     <ul>
         <li>get information on the last SQL query executed</li>
         <li>data includes: raw SQL, binds, duration, errors, etc</li>
     </ul>
 <code>
- $info = $db->getLastQuery();
+ $info = $db->lastQueryInfo();
 </code>
 
     <br><br><br>
 
 
-    <h2>displayLastQuery()</h2>
+    <h2>displayLastQueryInfo()</h2>
     <ul>
         <li>display information about the last query</li>
         <li>data includes: raw SQL, binds, duration, errors, etc</li>
     </ul>
 <code>
-$db->displayLastQuery();
+$db->displayLastQueryInfo();
 </code>
 
     <br><br><br>
@@ -323,7 +321,7 @@ $db->displayLastQuery();
 
     <h2>info()</h2>
     <ul>
-        <li>shortcut for displayLastQuery</li>
+        <li>shortcut for displayLastQueryInfo</li>
     </ul>
 <code>
 $db->info();
@@ -342,6 +340,11 @@ $db->info();
 $db->display($customer);
 </code>
 
+
+lastError
+hasDbConnection
+lastQuerySuccessful
+success
 
 
 </body>

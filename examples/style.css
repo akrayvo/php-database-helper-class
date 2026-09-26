@@ -148,7 +148,10 @@ div {
 }
 
 code {
-  display: block;
-  white-space: pre;       /* Preserves spaces, tabs, and line breaks */
+display: block;
+  white-space: pre;
   font-family: monospace;
+  background-color: #E8E8E8;
+  padding: 0 0 20px 12px;
+  border-left: 6px solid #666;
 }

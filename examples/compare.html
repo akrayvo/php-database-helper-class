@@ -1,0 +1,459 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Database Helper Examples - Compare</title>
+    <link rel="stylesheet" href="./style.css">
+</head>
+
+<body>
+    <h1>Examples - Compare</h1>
+    <div><a href="./">&laquo; back to All Examples</a></div><br><br>
+
+
+<h2>Connect to Database</h2>
+<br>
+
+<h3>Native PHP</h3>
+<code>
+// connect to the database
+$pdo = new PDO(
+    'mysql:host=localhost;dbname=my_database;charset=utf8mb4',
+    'username',
+    'password'
+);
+</code>
+
+<br>
+
+<h3>DatabaseHelper Class</h3>
+<code>
+// include the class file
+require_once('../DatabaseHelper.class.php');
+// initialize class
+$db = new DatabaseHelper(
+    "your_db",          // db name
+    "127.0.0.1",        // host
+    "your_username",    // user
+    "your_password"     // password
+);
+</code>
+
+<br><br><br>
+
+
+
+<h2>Get Records (basic)</h2>
+<br>
+
+<h3>Native PHP</h3>
+<code>
+$sql = 'select * from customers';
+
+// prepare SQL statement
+$statement = $pdo->prepare($sql);
+
+// execute query
+$statement->execute();
+
+// get all records
+$customers = $statement->fetchAll(PDO::FETCH_ASSOC);
+</code>
+
+<br>
+
+<h3>DatabaseHelper Class</h3>
+<code>
+
+$sql = 'select * from customers';
+
+// get all records
+$customers = $db->all($sql);
+</code>
+
+
+<br><br><br>
+
+
+<h2>Get Records (filtered, sorted, and limited)</h2>
+<br>
+
+<h3>Native PHP</h3>
+<code>
+$sql = 'select id, first_name, username from customers where last_name = :last_name order by first_name limit 10;';
+$binds = array(':last_name' => 'Smith');
+
+// prepare SQL statement
+$statement = $pdo->prepare($sql);
+
+// execute query with bound values
+$statement->execute($binds);
+
+// get records
+$customers = $statement->fetchAll(PDO::FETCH_ASSOC);
+
+</code>
+
+<br>
+
+<h3>DatabaseHelper Class</h3>
+<code>
+$sql = 'select id, first_name, username from customers where last_name = :last_name order by first_name limit 10;';
+$binds = array(':last_name' => 'Smith');
+
+// get records
+$customers = $db->all($sql, $binds);
+</code>
+
+<br><br><br>
+
+
+<h2>Get One Record</h2>
+<br>
+
+<h3>Native PHP</h3>
+<code>
+$sql = 'select * from customers where last_name = :last_name order by first_name limit 1;';
+$binds = array(':last_name' => 'Jones');
+
+// prepare SQL statement
+$statement = $pdo->prepare($sql);
+
+// execute query with bound values
+$statement->execute($binds);
+
+// get the first record
+$customer = $statement->fetch(PDO::FETCH_ASSOC);
+</code>
+
+<br>
+
+<h3>DatabaseHelper Class</h3>
+<code>
+$sql = 'select * from customers where last_name = :last_name order by first_name limit 1;';
+$binds = array(':last_name' => 'Jones');
+
+// get the first record
+$customer = $db->row($sql, $binds);
+</code>
+
+<br><br><br>
+
+<h2>Get One Record By ID</h2>
+<br>
+
+<h3>Native PHP</h3>
+<code>
+$sql = 'select * from customers where id = :id;';
+$binds = array(':id' => 15);
+
+// prepare SQL statement
+$statement = $pdo->prepare($sql);
+
+// execute query with bound values
+$statement->execute($binds);
+
+// get the first record
+$customer = $statement->fetch(PDO::FETCH_ASSOC);
+</code>
+
+<br>
+
+<h3>DatabaseHelper Class</h3>
+<code>
+$table = 'customers';
+$customerId = 15;
+
+// get the record
+$customer = $db->rowById($table, $customerId);
+</code>
+
+
+<br><br><br>
+
+
+<h2>Get Column Values in Associative Array</h2>
+<br>
+
+<h3>Native PHP</h3>
+<code>
+$sql = 'select id, username from customers where username = :username order by username;';
+$binds = array(':username' => 'bob_jones');
+
+// prepare SQL statement
+$statement = $pdo->prepare($sql);
+
+// execute query with bound values
+$statement->execute($binds);
+
+// get all records
+$customers = $statement->fetchAll(PDO::FETCH_ASSOC);
+
+// create an array empty array for usernames
+$usernames = array();
+
+// check that the query was successful
+if ($customers) {
+    // loop through results from the database
+    foreach ($customers as $customer) {
+        // set each array value using the id field as the key
+        $usernames[$customer['id']] = $customer['username'];
+    }
+}
+</code>
+
+<br>
+
+<h3>DatabaseHelper Class</h3>
+<code>
+$sql = 'select id, username from customers where username = :username order by username;';
+$binds = array(':username' => 'bob_jones');
+$keyField = 'id';
+$valueField = 'username';
+
+// note that the col function is a shortcut for the column function. either $db->col() or $db->column() could be used
+$usernames = $db->col($sql, $binds, $keyField, $valueField);
+</code>
+
+
+<br><br><br>
+
+
+<h2>Get One Value By ID</h2>
+<br>
+
+<h3>Native PHP</h3>
+<code>
+$sql = 'select username from customers where id = :id limit 1;';
+$binds = array(':id' => 25);
+
+// prepare SQL statement
+$statement = $pdo->prepare($sql);
+
+// execute query with bound values
+$statement->execute($binds);
+
+// get the first record
+$customer = $statement->fetch(PDO::FETCH_ASSOC);
+
+// set default value in case the record is not found
+$username = '';
+
+if ($customer) {
+    // get the username
+    $username = $customer['username'];
+}
+</code>
+
+<br>
+
+<h3>DatabaseHelper Class</h3>
+<code>
+// get the username
+$username = $db->oneById('customers', 25, 'username');
+</code>
+
+<br><br><br>
+
+
+<h2>Insert Record</h2>
+<br>
+
+<h3>Native PHP</h3>
+<code>
+$sql = 'insert into customers (first_name, last_name, username) values (:first_name, :last_name, :username);';
+$binds = array(
+    ':first_name' => 'John',
+    ':last_name' => 'Jones',
+    ':username' => 'john_jones'
+);
+
+// prepare SQL statement
+$statement = $pdo->prepare($sql);
+
+// execute query with bound values
+$statement->execute($binds);
+
+// get the identifier of the newly inserted record
+$newCustomerId = $pdo->lastInsertId();
+</code>
+
+<br>
+
+<h3>DatabaseHelper Class</h3>
+<code>
+$table = 'customers';
+$fields = array(
+    'first_name' => 'John',
+    'last_name' => 'Jones',
+    'username' => 'john_jones'
+);
+
+// insert a new record and get its identifier
+$newCustomerId = $db->insert($table, $fields);
+</code>
+
+<br><br><br>
+
+
+<h2>Update Record By ID</h2>
+<br>
+
+<h3>Native PHP</h3>
+<code>
+$sql = 'update customers set first_name = :first_name where id = :id;';
+$binds = array(
+    ':first_name' => 'Robert',
+    ':id' => 25
+);
+
+// prepare SQL statement
+$statement = $pdo->prepare($sql);
+
+// execute query with bound values
+$statement->execute($binds);
+
+// check if the query was successful
+$isSuccess = ($statement->errorCode() === '00000');
+</code>
+
+<br>
+
+<h3>DatabaseHelper Class</h3>
+<code>
+$table = 'customers';
+$values = array('first_name' => 'Robert');
+$customerId = 25;
+
+// update the record
+$isSuccess = $db->updateById($table, $values, $customerId);
+</code>
+
+
+<br><br><br>
+
+
+<h2>Delete Record By ID</h2>
+<br>
+
+<h3>Native PHP</h3>
+<code>
+$sql = 'delete from customers where id = :id;';
+$binds = array(':id' => 25);
+
+// prepare SQL statement
+$statement = $pdo->prepare($sql);
+
+// execute query with bound values
+$statement->execute($binds);
+
+// check if the query was successful
+$isSuccess = ($statement->errorCode() === '00000');
+</code>
+
+<br>
+
+<h3>DatabaseHelper Class</h3>
+<code>
+$table = 'customers';
+$customerId = 25;
+
+// delete the record
+$isSuccess = $db->deleteById($table, $customerId);
+</code>
+
+<br><br><br>
+
+
+
+<h2>Display Query Information</h2>
+<br>
+
+<h3>Native PHP</h3>
+<code>
+// Native PHP has no direct equivalent of this functionality. it is specific to the DatabaseHelper class
+//
+// getting this information using native PHP would require saving:
+// * SQL and bound values passed to the query
+// * time before and after the query and the calculated duration
+// * most recent query error: $statement->errorInfo()
+// * insert ID: $pdo->lastInsertId()
+// * number of rows affected or returned: $statement->rowCount()
+//
+</code>
+
+<br>
+
+<h3>DatabaseHelper Class</h3>
+<code>
+// for efficiency, this information is not tracked by default. the save_last_query_info setting must be set to true to use the function
+// this should usually only be on for development or testing
+$db->updateSetting('save_last_query_info', true);
+
+// a class function that runs a query. displayLastQueryInfo will display information relating to this query
+$customers = $db->all('select * from customers');
+
+// output query information
+// note that the info function is a shortcut for the displayLastQueryInfo function. either $db->info() or $db->displayLastQueryInfo() could be used
+$db->info();
+</code>
+
+<br><br><br>
+
+
+<h2>Display Query Results</h2>
+<br>
+
+<h3>Native PHP</h3>
+<code>
+// run a query
+$sql = 'select * from customers';
+$statement = $pdo->prepare($sql);
+$statement->execute();
+
+// get all records
+$customers = $statement->fetchAll(PDO::FETCH_ASSOC);
+
+// output results as an HTML table
+echo '&lt;table&gt;';
+
+// output table headers
+echo '&lt;tr&gt;';
+foreach ($customers[0] as $field => $value) {
+    echo '&lt;th&gt;' . htmlspecialchars($field) . '&lt;/th&gt;';
+}
+echo '&lt;/tr&gt;';
+
+// output table rows
+foreach ($customers as $customer) {
+    echo '&lt;tr&gt;';
+
+    foreach ($customer as $value) {
+        echo '&lt;td&gt;' . htmlspecialchars($value) . '&lt;/td&gt;';
+    }
+
+    echo '&lt;/tr&gt;';
+}
+
+echo '&lt;/table&gt;';
+</code>
+<br>
+<h3>DatabaseHelper Class</h3>
+<code>
+// get all records
+$customers = $db->all('select * from customers');
+
+// display the results as an HTML table
+// note that any variable can be displayed by this function, but it is most useful for query results or a similarly formatted array
+$db->display($customers);
+</code>
+</code>
+
+<br><br>
+
+
+</body>
+
+</html>

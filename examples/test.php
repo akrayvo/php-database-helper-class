@@ -27,7 +27,7 @@ $db = new DatabaseHelper(
 
 
     <?php
-    if (!$db->getHasDbConnection()) {
+    if (!$db->hasDbConnection()) {
         echo '<p>*note: This page provides code examples that can be viewed and used without a database setup/connection. ' . 
             'The examples can also be run interactively if desired. To do so: <ul><p>'.
             '<li>create the example database called <b>db_class_movies</b></li>'.
