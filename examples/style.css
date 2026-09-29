@@ -21,7 +21,7 @@ td,
 td,
 textarea {
   font-family: Arial, 'Helvetica Neue', Helvetica, sans-serif;
-  font-size: 14px;
+  font-size: 16px;
 }
 
 h1 {
@@ -155,3 +155,29 @@ display: block;
   padding: 0 0 20px 12px;
   border-left: 6px solid #666;
 }
+
+.message {
+  background-color: #DDD;
+  padding: 10px 16px;
+  border-radius: 10px;
+  border: 2px solid #060;
+  color: #060;
+  font-weight: bold;
+}
+
+.message.error_message {
+  background-color: #FDD;
+  border: 2px solid #600;
+  color: #600;
+}
+
+.field label {
+  display: block;
+  margin-bottom: 4px;
+}
+
+.field {
+  margin-bottom: 16px;
+}
+
+form { display: inline-block;}

@@ -37,20 +37,21 @@ INSERT INTO `genres` (`id`, `genre`) VALUES
 CREATE TABLE `movies` (
   `id` int(10) UNSIGNED NOT NULL,
   `title` varchar(255) NOT NULL,
-  `release_date` date NOT NULL
+  `release_date` date NOT NULL,
+  `updated_date` datetime NOT NULL
 ) ENGINE=MyISAM DEFAULT CHARSET=latin1;
 
-INSERT INTO `movies` (`id`, `title`, `release_date`) VALUES
-(1, 'The Terminator', '1984-10-26'),
-(2, 'Terminator 2: Judgment Day', '1991-07-03'),
-(3, 'The Bourne Identity', '2002-06-14'),
-(4, 'Pretty Woman', '1990-03-23'),
-(5, 'Forrest Gump', '1994-07-06'),
-(6, 'Armageddon', '1998-07-01'),
-(7, 'Ocean\'s Eleven', '2001-12-07'),
-(8, 'Die Hard', '1988-07-20'),
-(9, 'Toy Story', '1995-11-22'),
-(10, 'My Big Fat Greek Wedding', '2002-04-19');
+INSERT INTO `movies` (`id`, `title`, `release_date`, `updated_date`) VALUES
+(1, 'The Terminator', '1984-10-26', NOW()),
+(2, 'Terminator 2: Judgment Day', '1991-07-03', NOW()),
+(3, 'The Bourne Identity', '2002-06-14', NOW()),
+(4, 'Pretty Woman', '1990-03-23', NOW()),
+(5, 'Forrest Gump', '1994-07-06', NOW()),
+(6, 'Armageddon', '1998-07-01', NOW()),
+(7, 'Ocean\'s Eleven', '2001-12-07', NOW()),
+(8, 'Die Hard', '1988-07-20', NOW()),
+(9, 'Toy Story', '1995-11-22', NOW()),
+(10, 'My Big Fat Greek Wedding', '2002-04-19', NOW());
 
 CREATE TABLE `movie_actor` (
   `movie_id` int(10) UNSIGNED NOT NULL,
@@ -121,4 +122,5 @@ ALTER TABLE `actors`
 ALTER TABLE `genres`
   MODIFY `id` int(10) UNSIGNED NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=9;
 ALTER TABLE `movies`
-  MODIFY `id` int(10) UNSIGNED NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=11;COMMIT;
+  MODIFY `id` int(10) UNSIGNED NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=11;
+  
