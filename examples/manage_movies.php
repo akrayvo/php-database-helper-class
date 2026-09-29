@@ -435,6 +435,7 @@ function pageHeader()
     <body>
 
         <h1>Database Helper Examples - Working</h1>
+        <div><a href="./">&laquo; back to All Examples</a></div><br><br>
         <br>
     <?php
 }
