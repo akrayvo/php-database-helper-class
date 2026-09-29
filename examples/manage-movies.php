@@ -1,19 +1,47 @@
 <?php
 
+/**
+ * DatabaseHelper example - Movie database
+ *
+ * this page is an example of using the DatabaseHelper class to create a simple
+ * movie database management application. it demonstrates adding, editing, viewing,
+ * and deleting movies, as well as managing the associated actors and genres.
+ *
+ * you do not need to set up a database or web server to look through this file.
+ * the page is intended primarily as an example of how to use the DatabaseHelper
+ * class, so you can read the code and see how the class is used without running it.
+ *
+ * the page is fully functional. if you want to run it, you will need a PHP-enabled
+ * web server and MySQL.
+ *
+ *      1. copy this file and the DatabaseHelper class file (DatabaseHelper.class.php)
+ *          to your web server.
+ *
+ *      2. create a new MySQL database. the database can have any name. ex: db_class_movies
+ *
+ *      3. import the provided db_class_movies.sql into the new database. this SQL 
+ *          file creates the tables and inserts test data.
+ *
+ *      4. update the database connection information below. make sure the DatabaseHelper
+ *          class file include points to the correct location, and set the database name,
+ *          host, username, and password for your MySQL server.
+ *
+ *      5. open this page through your web server.
+ *
+ */
+
 ini_set('display_errors', '1');
 ini_set('display_startup_errors', '1');
 error_reporting(E_ALL);
 
 require_once('../DatabaseHelper.class.php');
 
-
-
-
+// database connection
 $db = new DatabaseHelper(
-    'db_class_movies',
-    'localhost',
-    'root',
-    ''
+    'db_class_movies',  // table
+    'localhost',        // host
+    'root',             // username
+    ''                  // password
 );
 
 
@@ -21,30 +49,35 @@ function getMovies()
 {
     global $db;
 
-    //$sql = 'SELECT * FROM movies ORDER BY title ASC, release_date DESC';
+    // a query to get all movies, plus a list of actors and genres for each
     $sql = 'SELECT
             M.*,
             GROUP_CONCAT(DISTINCT A.name ORDER BY A.name SEPARATOR ", ") AS actor_list,
             GROUP_CONCAT(DISTINCT G.genre ORDER BY G.genre SEPARATOR ", ") AS genre_list
-        FROM movies as M
-        LEFT JOIN movie_actor as MA ON MA.movie_id = M.id
-        LEFT JOIN actors as A ON a.id = MA.actor_id
-        LEFT JOIN movie_genre as MG ON MG.movie_id = M.id
-        LEFT JOIN genres as G ON G.id = MG.genre_id
+        FROM movies AS M
+        LEFT JOIN movie_actor AS MA ON MA.movie_id = M.id
+        LEFT JOIN actors AS A ON A.id = MA.actor_id
+        LEFT JOIN movie_genre AS MG ON MG.movie_id = M.id
+        LEFT JOIN genres AS G ON G.id = MG.genre_id
         GROUP BY M.id
         ORDER BY M.title ASC, M.release_date DESC';
 
     return $db->all($sql);
 }
 
+/**
+ * @param int $movieId
+*/
 function getMovie($movieId)
 {
     global $db;
 
+     // query all information for a single movie, then add genres and actors
     $movie = $db->rowById('movies', $movieId);
     $movie['actors'] = $db->col('SELECT actor_id FROM movie_actor WHERE movie_id=:movie_id;', array('movie_id' => $movieId));
     $movie['genres'] = $db->col('SELECT genre_id FROM movie_genre WHERE movie_id=:movie_id;', array('movie_id' => $movieId));
 
+    // check that the movie actually exists. show an error if not.
     if (empty($movie)) {
         pageHeader();
         echo '<div class="message error_message">Movie Not Found</div>';
@@ -52,6 +85,7 @@ function getMovie($movieId)
         pageFooter();
         die();
     }
+
     return $movie;
 }
 
@@ -59,6 +93,7 @@ function getActorList()
 {
     global $db;
 
+    // make an array of all actors, the array key is the id
     $sql = 'SELECT id, name FROM actors ORDER BY name;';
     $binds = array();
     $keyField = 'id';
@@ -71,6 +106,7 @@ function getGenreList()
 {
     global $db;
 
+    // make an array of all genres, the array key is the id
     $sql = 'SELECT id, genre FROM genres ORDER BY genre;';
     $binds = array();
     $keyField = 'id';
@@ -79,38 +115,48 @@ function getGenreList()
     return $db->col($sql, $binds, $keyField, $valueField);
 }
 
-function deleteMovie($movieId)
+/**
+ * @param int $movieId
+*/
+function deleteMovie()
 {
     global $db;
 
+    $movieId = intval($_POST['movie_id']);
+
+    // get information on the current movie so that we know it exists.
+    // we also have the movie name for the confirmation message
     $movie = getMovie($movieId);
 
-    $isSuccess = $db->deleteById('movies', $movieId);
-
     $message = '';
-    if ($isSuccess) {
-        $db->query('DELETE FROM movie_actor WHERE movie_id=:movie_id;', array('movie_id' => $movieId));
-        $db->query('DELETE FROM movie_genre WHERE movie_id=:movie_id;', array('movie_id' => $movieId));
-        $message = 'Movie Deleted: ' . $movie['title'];
+    if (!empty($movie)) {
+        // delete the movie
+        $isSuccess = $db->deleteById('movies', $movieId);
+        
+        if ($isSuccess) {
+            // the movie was successfully deleted, delete associated data and set the message.
+            $db->query('DELETE FROM movie_actor WHERE movie_id=:movie_id;', array('movie_id' => $movieId));
+            $db->query('DELETE FROM movie_genre WHERE movie_id=:movie_id;', array('movie_id' => $movieId));
+            $message = 'Movie Deleted: ' . $movie['title'];
+        }
     }
 
     viewMovies($message);
 }
 
-
-function saveMovie($movieId = 0)
+/**
+ * @param int $movieId
+*/
+function saveMovie()
 {
     global $db;
 
-    $actors = $genres = array();
-
-    $movieId = $_POST['movie_id'];
-
+    // get information on the movie passed through the form
+    $movieId = intval($_POST['movie_id']);
     $releaseDate = $_POST['release_date'];
-
     $title = trim($_POST['title']);
-    $releaseDate = $_POST['release_date'];
 
+    // error checking
     $errors = array();
     if (empty($title)) {
         $errors[] = 'Title is required';
@@ -118,8 +164,12 @@ function saveMovie($movieId = 0)
     if (empty($releaseDate)) {
         $errors[] = 'Release Date is required';
     }
-
     if (empty($errors)) {
+        // check the movie was not already added.
+        // we're using the title and release data as unique data, so if they are the same, it's a duplicate
+        // we're checking the id so we won't consider the same record as a duplicate
+        // for new records the id will be 0, since no record has an id of 0, "id<>:id" will always be TRUE.
+        //      we could also send different queries depending on we have to check id (edit) or not (add)
         $sql = 'SELECT id FROM movies WHERE title=:title AND release_date=:release_date AND id<>:id limit 1;';
         $binds = array(':title' => $title, ':release_date' => $releaseDate, ':id' => $movieId);
         $existingMovieId = $db->one($sql, $binds);
@@ -129,10 +179,13 @@ function saveMovie($movieId = 0)
     }
 
     if (!empty($errors)) {
+        // there as an error, send error message to the form and skip processing
         movieForm($errors);
         return;
     }
 
+    // values for the database
+    // the same values will be used whether the movie exists (edit) or is new (add)
     $values = array(
         'title' => $title,
         'release_date' => $releaseDate,
@@ -141,11 +194,14 @@ function saveMovie($movieId = 0)
 
     $message = '';
     if ($movieId) {
+        // update existing
         $isSuccess = $db->updateById('movies', $values, $movieId);
         if ($isSuccess) {
             $message = "Movie Updated: " . $title;
         }
     } else {
+        // add new
+        // the insert ID is returned, we will use this to add associated data
         $movieId = $db->insert('movies', $values);
         if ($movieId) {
             $message = "Movie Added: " . $title;
@@ -153,70 +209,95 @@ function saveMovie($movieId = 0)
     }
 
     if ($movieId) {
+        // $movieId is set, either record existed before or we just successfully added it
 
+        // get all actor id's with records already in the movie_actor table for this movie
         $sql = 'SELECT actor_id FROM movie_actor WHERE movie_id=:movie_id;';
         $binds = array(':movie_id' => $movieId);
         $movieActorIds = $db->col($sql, $binds);
 
+        // after adding we're going to delete all records not in the $keepIds array (associated records removed)
         $keepIds = array();
-        $values = array();
+        // arrays of values, well save this data and then insert all needed records at once
+        $inserts = array();
+        
         if (!empty($_POST['actors'])) {
+            // some data has been passed through the form (at least one item checked)
             foreach ($_POST['actors'] as $actorId) {
+                // convert values to integers. they will later be entered directly into the query rather than using
+                //     binding, so this is required to prevent possible SQL injection.
                 $keepIds[] = intval($actorId);
                 if (!in_array($actorId, $movieActorIds)) {
-                    // record does not yet exist
-                    $values[] = array('movie_id' => $movieId, 'actor_id' => $actorId);
+                    // record does not yet exist, put in array to be added
+                    $inserts[] = array('movie_id' => $movieId, 'actor_id' => $actorId);
                 }
             }
         }
-        if (!empty($values)) {
-            $db->insertMultiple('movie_actor', $values);
+        if (!empty($inserts)) {
+            // at least 1 record is to be inserted
+            // insert records
+            $db->insertMultiple('movie_actor', $inserts);
         }
 
         $binds = array(':movie_id' => $movieId);
         if (empty($keepIds)) {
+            // no records are set (no checkboxes clicked), remove all records for the movie
             $db->query('DELETE FROM movie_actor where movie_id=:movie_id;', $binds);
         } else {
+            // some records are set(checkboxes clicked), remove all records for the movie other than the set ones
+            // note that values originally generated by the user are added directly to the query rather than using PDO binding. in this case, all
+            //      values have been converted to integers, so this isn't a security issue (no chance of SQL injection).
             $db->query('DELETE FROM movie_actor where movie_id=:movie_id and actor_id NOT IN (' . implode(',', $keepIds) . ');', $binds);
         }
 
-        $sql = 'SELECT actor_id FROM movie_actor WHERE movie_id=:movie_id;';
-        $binds = array(':movie_id' => $movieId);
-        $movieActorIds = $db->col($sql, $binds);
 
-
+        // get all genre id's with records already in the movie_genre table for this movie
         $sql = 'SELECT genre_id FROM movie_genre WHERE movie_id=:movie_id;';
         $binds = array(':movie_id' => $movieId);
         $movieGenreIds = $db->col($sql, $binds);
 
+        // after adding we're going to delete all records not in this $keepIds array (associated records removed)
         $keepIds = array();
-        $values = array();
+        // arrays of values, we'll save this data and then insert all needed records at once
+        $inserts = array();
+        
         if (!empty($_POST['genres'])) {
+            // some data has been passed through the form (at least one item checked)
             foreach ($_POST['genres'] as $genreId) {
                 $keepIds[] = intval($genreId);
                 if (!in_array($genreId, $movieGenreIds)) {
-                    // record does not yet exist
-                    $values[] = array('movie_id' => $movieId, 'genre_id' => $genreId);
+                    // record does not yet exist, put in array to be added
+                    $inserts[] = array('movie_id' => $movieId, 'genre_id' => $genreId);
                 }
             }
         }
-        if (!empty($values)) {
-            $db->insertMultiple('movie_genre', $values);
+        if (!empty($inserts)) {
+            // at least 1 record is to be inserted
+            // insert records
+            $db->insertMultiple('movie_genre', $inserts);
         }
 
         $binds = array(':movie_id' => $movieId);
         if (empty($keepIds)) {
+            // no records are set (no checkboxes clicked), remove all records for the movie
             $db->query('DELETE FROM movie_genre where movie_id=:movie_id;', $binds);
         } else {
+            // some records are set(checkboxes clicked), remove all records for the movie other than the set ones
             $db->query('DELETE FROM movie_genre where movie_id=:movie_id and genre_id NOT IN (' . implode(',', $keepIds) . ');', $binds);
         }
     }
 
+    // display movies list with message
     viewMovies($message);
 }
 
+/**
+ * @param string $message
+*/
 function viewMovies($message = '')
 {
+    // display the list of movies
+
     $movies = getMovies();
     pageHeader();
 ?>
@@ -251,8 +332,8 @@ function viewMovies($message = '')
                     <td><?php echo htmlspecialchars($movie['id']); ?></td>
                     <td><?php echo htmlspecialchars($movie['title']); ?></td>
                     <td><?php echo htmlspecialchars($movie['release_date']); ?></td>
-                    <td><?php echo htmlspecialchars($movie['actor_list']); ?></td>
                     <td><?php echo htmlspecialchars($movie['genre_list']); ?></td>
+                    <td><?php echo htmlspecialchars($movie['actor_list']); ?></td>
                     <td><?php echo htmlspecialchars($movie['updated_date']); ?></td>
                     <td class="actions">
 
@@ -283,6 +364,8 @@ function viewMovies($message = '')
 
 function movieForm($errors = array())
 {
+    // display the movie add/update form
+
     global $db;
 
     $actors = getActorList();
@@ -291,10 +374,6 @@ function movieForm($errors = array())
     $movieId = 0;
     if (!empty($_POST['movie_id'])) {
         $movieId = $_POST['movie_id'];
-    } elseif (!empty($_GET['movie_id'])) {
-        $movieId = $_GET['movie_id'];
-    } elseif (!empty($_GET['movie_id'])) {
-        $movieId = $_GET['movie_id'];
     } elseif (!empty($_GET['movie_id'])) {
         $movieId = $_GET['movie_id'];
     }
@@ -422,6 +501,8 @@ function movieForm($errors = array())
 
 function pageHeader()
 {
+    // display the HTML page header
+
 ?>
     <!DOCTYPE html>
     <html>
@@ -435,22 +516,23 @@ function pageHeader()
     <body>
 
         <h1>Database Helper Examples - Working</h1>
-        <div><a href="./">&laquo; back to All Examples</a></div><br><br>
+        <div><a href="./">&laquo; back to All Examples</a></div>
         <br>
     <?php
 }
 
 function pageFooter()
 {
+    // display the HTML page header
     ?>
     </body>
-
     </html>
 <?php
 }
 
 
-
+// get the page method: add_movie, edit_movie, save_movie, or delete_movie
+// could be passed by POST or GET
 $method = '';
 if (!empty($_POST['method'])) {
     $method = $_POST['method'];
@@ -458,17 +540,9 @@ if (!empty($_POST['method'])) {
     $method = $_GET['method'];
 }
 
-$movieId = '';
-if (!empty($_POST['movie_id'])) {
-    $movieId = intval($_POST['movie_id']);
-} elseif (!empty($_GET['movie_id'])) {
-    $movieId = intval($_GET['movie_id']);
-}
-
+// load the function based on the page method
 switch ($method) {
     case "add_movie":
-        movieForm();
-        break;
     case "edit_movie":
         movieForm();
         break;
