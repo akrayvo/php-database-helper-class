@@ -10,137 +10,64 @@ $db = new DatabaseHelper(
     ""
 );
 
-?>
-<!DOCTYPE html>
-<html lang="en">
+$db->updateSetting('connection_error_action', 'continue_without_database');
 
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Database Helper Examples - Basic</title>
-    <link rel="stylesheet" href="./style.cs?z">
-</head>
+$db->updateSetting('query_error_action', 'continue_without_database');
 
-<body>
-    <h1>Examples - Basic</h1>
-    <div><a href="./">&laquo; back to All Examples</a></div><br><br>
+$sql = 'select * from movies limit 100';
+$movies = $db->all($sql);
+$db->display($movies);
+$db->displayLastQueryInfo();
+
+//$db->updateSetting('save_query_run_timez', true);
+
+$db->updateSetting('save_query_run_time', true);
+$db->updateSetting('output_error_debugging', true);
+$db->updateSetting('return_null_on_error', true);
+$db->updateSetting('delete_and_update_require_where', true);
+
+$sql = 'select * from movies limit 100';
+$movies = $db->all($sql);
+$db->display($movies);
+$db->displayLastQueryInfo();
+
+$sql = 'update movies set updated_date = "1980-01-05";';
+$movies = $db->all($sql);
+$db->display($movies);
+$db->displayLastQueryInfo();
 
 
-    <?php
-    if (!$db->hasDbConnection()) {
-        echo '<p>*note: This page provides code examples that can be viewed and used without a database setup/connection. ' . 
-            'The examples can also be run interactively if desired. To do so: <ul><p>'.
-            '<li>create the example database called <b>db_class_movies</b></li>'.
-            '<li>run the supplied sql data import to create and populate tables.</li>'.
-            '<li>set up the connection at the top of the page (if on a local host, it may work as is.</li>'.
-            '</lu>';
-    }
-    ?>
+// $sql = 'select M1.title as m1t, M2.title as m2t, M3.title as m3t
+//     from movies as M1, movies as M2, movies as M3 limit 10';
+// $movies = $db->row($sql);
 
-    <h2>Get all movie records sorted alphabetically</h2>
-    <code>$movies = $db->all('select * from movies order by title;');</code>
+// $db->display($movies);
 
-    <?php
-    $movies = $db->all('select * from movies order by title limit 3;');
-    $db->display($movies);
-    echo '<pre>';
-    var_dump($movies);
-    echo '</pre>';
 
-    ?>
-    
+// $sql = 'select title, id from movies where title like :title limit 1;';
+// $x = $db->all($sql);
+// $x = $db->insert('movies', array('title'=>'mr test 2', 'release_date'=>'2001-02-03', 'updated_date'=>$db->raw('NOW()')));
+// $db->display($x);
+// $db->info();
 
-    <br><br><br>
+//$fields = array('title', 'release_date', 'updated_date');
+//$ar = array();
+//$ar = array('tit le'=>'this is updated title 2', 'release_date'=>'1999-02-03', 'updated_date'=>$db->raw('NOW()'));
+//$ar[] = array('title'=>'my fun 13zzz', 'release_date'=>'2001-02-03', 'updated_date'=>$db->raw('NOW()'));
 
-    <h2>Get all info for the first movie alphabetically</h2>
-    <code>$movie = $db->row('select * from movies order by title limit 1;');</code>
+///$x = $db->update('movies', $ar, 'id=:id', array(':id'=>24));
+//$db->display($x);
+//$db->info();
+$x = $db->deleteById('movies', 21);
+$db->display($x);
+$db->info();
 
-    <?php
+// $sql = 'select * from movies limit 100';
+// $movies = $db->all($sql);
+// $db->display($movies);
+// $db->displayLastQueryInfo();
 
-    $movie = $db->row('select * from movies order by title limit 1;');
-    $db->display($movie);
-
-    ?>
-
-    <br><br><br>
-
-    <h2>Get the title only for the first movie alphabetically</h2>
-    <code>$title = $db->one('select title from movies order by title limit 1;');</code>
-
-    <?php
-
-    $title = $db->one('select title from movies order by title limit 1;');
-
-    $db->display($title);
-
-    ?>
-
-    <br><br><br>
-
-    <h2>Insert, update, and delete</h2>
-
-    <h3>Insert</h3>
-    <code>
-    $values = array('title' => 'Top Gunner', 'release_date' => '2986-05-16');<br>
-    $insertId = $db->insert('movies', $values);
-    </code>
-
-    <?php
-
-        // data is intentionally wrong so that it can be updated
-        $values = array('title' => 'Top Gunner', 'release_date' => '2986-05-16');
-        $insertId = $db->insert('movies', $values);
-        if ($insertId) {
-            echo '<br><div>' . $values['title'] . " inserted with ID of $insertId</div>\n";
-        }
-
-        //if ($insertId) {
-        ?><br>
-        <h3>Get newly inserted record by ID</h3>
-        <code>$movie = $db->rowById('movies', $insertId);</code>
-        <?php
-            $movie = $db->rowById('movies', $insertId);
-            $db->display($movie);
-
-        ?><br>
-        <h3>Update release_date using update function</h3>
-        <code>$values = array('release_date' => '1986-05-16');<br>
-            $isSuccess = $db->update('movies', $values, 'id=:id', array(':id' => $insertId));</code>
-        <?php
-            $values = array('release_date' => '1986-05-16');
-            $isSuccess = $db->update('movies', $values, 'id=:id', array(':id' => $insertId));
-            $db->display($isSuccess);
-
-        ?><br>
-        <h3>Update title using updateById function</h3>
-
-        <?php
-            $values = array('title' => 'Top Gun');
-            $isSuccess = $db->updateById('movies', $values, $insertId);
-            $db->display($isSuccess);
-
-        ?><br>
-        <h3>Check updated record</h3>
-        <code>$movie = $db->rowById('movies', $insertId);</code>
-        <?php
-            $movie = $db->rowById('movies', $insertId);
-            $db->display($movie);
-
-        ?><br>
-        <h3>delete the record</h3>
-        <code>$isSuccess = $db->deleteById('movies', $insertId);</code>
-    <?php
-            $beforeDeleteCount = $db->one('select count(*) as total from movies;');
-            $isSuccess = $db->deleteById('movies', $insertId);
-            $db->display($isSuccess);
-            if ($isSuccess) {
-                $afterDeleteCount = $db->one('select count(*) as total from movies;');
-                echo "Record Deleted; record count before update = $beforeDeleteCount; after update = " . $afterDeleteCount;
-            }
-        //}
-
-    ?>
-
-</body>
-
-</html>
+$sql = 'select * from movies limit 100';
+$movies = $db->all($sql);
+$db->display($movies);
+$db->info();

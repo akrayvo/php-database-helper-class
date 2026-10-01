@@ -174,7 +174,7 @@ $newCustomerId = $db->insert('customers', array('first_name' => 'John', 'last_na
         <li>uses the array keys as field names and the array values as field values</li>
         <li>all rows must contain the same field names</li>
         <li>splits the insert into multiple queries when the number of rows exceeds the
-            max_rows_per_insert_multiple_query setting</li>
+            max_records_per_insert_query setting</li>
         <li>insert a new row into a table</li>
     </ul>
 <code>
@@ -194,7 +194,7 @@ $isSuccess = $db->insertMultiple('customers', array(
         <li>all rows must contain the same number of values as the number of fields</li>
         <li>pre-validates all rows before inserting, so a misformatted row prevents any rows from being inserted</li>
         <li>splits the insert into multiple queries when the number of rows exceeds the
-            max_rows_per_insert_multiple_query setting</li>
+            max_records_per_insert_query setting</li>
     </ul>
 <code>
 $isSuccess = $db->insertMultipleFieldsValues(

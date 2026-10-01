@@ -28,42 +28,34 @@ $db = new DatabaseHelper(
 
 <br><br><br>
 
-<h2>Get all user records sorted alphabetically</h2>
+<h2>Get all customer records sorted alphabetically</h2>
 <code>
+// returns an array of rows, each row is an array of key/value pairs
 $customers = $db->all('select * from customers order by last_name, first_name;');
 </code>
 
 <br><br><br>
 
-<h2>Get information on the last query</h2>
+<h2>Display information on the last query</h2>
 <code>
-// display information about the last query, such as the SQL, errors, duration, etc
+// display information about the last query, such as the SQL, errors, binds, etc
 $db->info();
 // display the value of the variable for debugging
 // works especially well for displaying a 2-dimensional array with matching keys as a table
 $db->display($customers);
 </code>
 
-<br><br><br>
-
-
-
-<h2>Get all user records sorted alphabetically</h2>
-<code>
-$customers = $db->all('select * from customers order by last_name, first_name;');
-</code>
-
 <br><br><br>    
 
-<h2>Get all info for the first user sorted alphabetically</h2>
+<h2>Get all fields for the first customer sorted alphabetically</h2>
 <code>
-$customers = $db->row('select * from customers order by last_name, first_name limit 1;');
+$customer = $db->row('select * from customers order by last_name, first_name limit 1;');
 </code>
 
 
 <br><br><br>
 
-<h2>Get the last name only for the first user sorted alphabetically</h2>
+<h2>Get the last name only for the first customer sorted alphabetically</h2>
 
 <code>
 $lastName = $db->one('select last_name from customers order by last_name, first_name limit 1;');
@@ -85,6 +77,7 @@ $insertId = $db->insert('customers', $values);
 <h3>Update</h3>
 <code>
 $values = array('first_name' => 'Robert');
+$id = 15;
 $isSuccess = $db->update('customers', $values, 'id=:id', array(':id' => $id));
 </code>
 
@@ -93,6 +86,7 @@ $isSuccess = $db->update('customers', $values, 'id=:id', array(':id' => $id));
 <h3>Update using the updateById function</h3>
 <code>
 $values = array('last_name' => 'Johnson');
+$id = 15;
 $isSuccess = $db->updateById('customers', $values, $id);
 </code>
 
@@ -100,6 +94,7 @@ $isSuccess = $db->updateById('customers', $values, $id);
 
 <h3>Delete</h3>
 <code>
+$id = 15;
 $isSuccess = $db->deleteById('customers', $id);
 </code>
 

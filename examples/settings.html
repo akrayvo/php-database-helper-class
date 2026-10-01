@@ -1,0 +1,414 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Database Helper Examples - Basic</title>
+    <link rel="stylesheet" href="./style.css">
+</head>
+
+<body>
+    <h1>Examples - Settings</h1>
+    <div><a href="./">&laquo; back to All Examples</a></div><br><br>
+
+    <h2>connection_error_action</h2>
+    <ul>
+        <li>how to handle a connection or initialization error</li>
+        <li>invalid configuration settings are also treated as initialization errors since they could keep data from
+            processing as expected</li>
+        <li>if changing the default value, change it in the settings array of the class file for connection errors. the
+            database connection is made in the constructor, so updateSetting() cannot be used to change this setting
+            until after the connection has been established.</li>
+        <li>valid values: 'exit', 'continue_without_database'
+        <ul style="margin-bottom:0;">
+            <li><b>exit</b>: completely end the program</li>
+            <li><b>continue_without_database</b>: the program continues, but subsequent database functions will not
+                execute. functions that modify data will do nothing and functions that return data will return empty
+                results</li>
+        </ul>
+        <li>note that there is no option to continue_with_database</li>        
+        </li>
+        <li>predefined options; default = <b>exit</b></li>
+    </ul>
+
+    <div>connection_error_action is set to "<b>exit</b>". the program will end on a connection or initialization error.</div>
+
+<code>
+$db->updateSetting('connection_error_action', 'exit');
+
+// update a setting that does NOT exist. this is an initialization error
+$db->updateSetting('setting_does_NOT_exist', true);
+
+// a message will display (see error_output_html) and debugging information will optionally display (see output_error_debugging)
+// the program will completely end
+</code>
+
+    <br>
+
+    <div>connection_error_action is set to "<b>continue_without_database</b>". the program will continue after an initialization error, but database queries will be skipped.</div>
+
+<code>
+$db->updateSetting('connection_error_action', 'continue_without_database');
+
+// update a setting that does NOT exist. this is an initialization error
+$db->updateSetting('setting_does_NOT_exist', true);
+
+// the program will continue
+// query functions will not work. functions that return data will return empty results.
+// no data-modifying actions will work (INSERT, UPDATE, DELETE)
+
+// this function will not query the database and will return empty results. the result will be the same whether the query is valid or whether data exists
+$customer = $db->row('SELECT * FROM customers LIMIT 1;');
+
+// $customer is null or an empty array (depending on return_null_on_error)
+</code>
+
+
+    <br><br><br>
+
+
+    <h2>query_error_action</h2>
+    <ul>
+        <li>how to handle a query error</li>
+        <li>valid values: 'exit', 'continue_without_database', 'continue_with_database'
+        <ul style="margin-bottom:0;">
+            <li><b>exit</b>: completely end the program</li>
+            <li><b>continue_without_database</b>: the program continues, but subsequent database functions will not
+                execute. functions that modify data will do nothing and functions that return data will return empty
+                results</li>
+            <li><b>continue_with_database</b>: the program continues and subsequent database functions will continue normally</li>
+            </ul>
+        </li>
+        <li>predefined options; default = <b>continue_without_database</b></li>
+    </ul>
+<div>query_error_action is set to "<b>exit</b>". the program will end on a query error.</div>
+<code>
+$db->updateSetting('query_error_action', 'exit');
+
+// query a table that does not exist. this will generate a query error
+$result = $db->row('SELECT * FROM table_does_not_exist;');
+
+// a message will display (see error_output_html) and debugging information will optionally display (see output_error_debugging)
+// the program will completely end
+</code>
+
+    <br>
+
+    <div>query_error_action is set to "<b>continue_without_database</b>". the program will continue after a query error, but database queries will be skipped.</div>
+<code>
+$db->updateSetting('query_error_action', 'continue_without_database');
+
+// query a table that does not exist. this will generate a query error
+$result = $db->row('SELECT * FROM table_does_not_exist;');
+
+// $result is null or an empty array (depending on return_null_on_error)
+
+// the program will continue
+// query functions will not work. 
+// functions that return data will return empty results. no data-modifying actions will work (INSERT, UPDATE, DELETE)
+
+// this function will not query the database and will return empty results. the result will be the same whether the query is valid or whether data exists
+$customer = $db->row('SELECT * FROM customers LIMIT 1;');
+
+// $customer is null or an empty array (depending on return_null_on_error)
+</code>
+
+<br>
+
+<div>query_error_action is set to "<b>continue_with_database</b>". the program will continue after a query error, but database queries will process normally.</div>
+<code>
+$db->updateSetting('query_error_action', 'continue_with_database');
+
+// query a table that does not exist. this will generate a query error
+$result = $db->row('SELECT * FROM table_does_not_exist;');
+
+// $result will be an empty value
+// the program will continue
+// query functions will not work. functions that return data will return empty results.
+// no data-modifying actions will work (INSERT, UPDATE, DELETE)
+
+// this function will query the database normally
+$customer = $db->row('SELECT * FROM customers LIMIT 1;');
+
+// $customer will be set assuming that the query is valid and a record exists in the table
+</code>
+
+
+
+<br><br><br>
+
+
+    <h2>error_output_html</h2>
+    <ul>
+        <li>HTML that will be displayed when an error causes the program to exit</li>
+        <li>is only displayed when <b>query_error_action</b> or <b>connection_error_action</b> are set to "<b>exit</b>"</li>
+        <!-- note the value should not be escaped, it's only escaped below to display in html. the actual default is "<div>There was an error loading the page</div>"  -->
+        <li>text; default = "<b>&lt;div&gt;There was an error loading the page&lt;/div&gt;</b>"</li>
+    </ul>
+<code>
+<!-- note the value should not be escaped, it's only escaped to display in html. -->
+// set the message
+$db->updateSetting('error_output_html', '&lt;div&gt;An Error Occurred&lt;/div&gt;');
+
+// update settings to end the program on query error
+$db->updateSetting('query_error_action', 'exit');
+
+// query a table that does not exist. this will generate a query error
+$result = $db->row('SELECT * FROM table_does_not_exist;');
+
+// "An Error Occurred" message will display in a div
+// the program will completely end
+</code>
+
+
+
+<br><br><br>
+
+
+    <h2>output_error_debugging</h2>
+    <ul>
+        <li>output debugging information to the screen when an error causes the program to exit</li>
+        <li>debugging information is only displayed when <b>query_error_action</b> or <b>connection_error_action</b> are set to "<b>exit</b>"</li>
+        <li>should be set to false in production environments</li>
+        <li>true or false (boolean); default = <b>false</b></li>
+    </ul>
+    <div>output_error_debugging is set to <b>false</b>. when an error causes the program to exit, debugging information will NOT be displayed</div>
+<code>
+$db->updateSetting('output_error_debugging', false);
+
+// update setting to exit the program on query error
+$db->updateSetting('query_error_action', 'exit');
+
+// query a table that does not exist. this will generate a query error
+$result = $db->row('SELECT * FROM table_does_not_exist;');
+
+// no debugging information is displayed 
+// the program will completely end
+</code>
+<br>
+<div>output_error_debugging is set to <b>true</b>.  when an error causes the program to exit, debugging information will be displayed before exiting</div>
+<code>
+$db->updateSetting('output_error_debugging', true);
+
+// update setting to exit the program on query error
+$db->updateSetting('query_error_action', 'exit');
+
+// query a table that does not exist. this will generate a query error
+$result = $db->row('SELECT * FROM table_does_not_exist;');
+
+// debugging information is displayed with details about the failed query
+// the program will completely end
+</code>
+
+
+<br><br><br>
+
+
+
+<h2>return_null_on_error</h2>
+    <ul>
+        <li>on query error, return null</li>
+        <li>affects all(), row(), column(), one(), rowById(), and oneById()</li>
+        <li>default behavior is to return an empty, a blank string, or false depending on the function</li>
+        <li>allows the developer to distinguish between a valid query that returns no results and a query error</li>
+        <li>true or false (boolean); default = <b>false</b></li>
+    </ul>
+    <div>return_null_on_error is set to <b>false</b>.</div>
+<code>
+$db->updateSetting('return_null_on_error', false);
+
+// valid query that will never return a result
+$customer = $db->row('SELECT * FROM customers WHERE false LIMIT 1;');
+
+// $customer will be an empty array()
+
+// query a table that does not exist. this will generate a query error
+$result = $db->row('SELECT * FROM table_does_not_exist LIMIT 1;');
+
+// $result will be an empty array()
+</code>
+<br>
+<div>return_null_on_error is set to <b>true</b>.</div>
+<code>
+$db->updateSetting('return_null_on_error', true);
+
+// valid query that will never return a result
+$customer = $db->row('SELECT * FROM customers WHERE false LIMIT 1;');
+
+// $customers will be an empty array()
+
+// query a table that does not exist. this will generate a query error
+$result = $db->row('SELECT * FROM table_does_not_exist LIMIT 1;');
+
+// $result will be null
+</code>
+
+
+
+<br><br><br>
+
+
+
+    <h2>id_field_name</h2>
+    <ul>
+        <li>the unique identifier column in tables</li>
+        <li>used by all "ById" functions to find a record by identifier</li>
+        <li>will usually not need to be changed since most databases use "id" as the identifier field name</li>
+        <li>text; default = "<b>id</b>"</li>
+    </ul>
+    <div>id_field_name is set to <b>uuid</b>. this tells the database that "<b>uuid</b>" is the unique identifier for tables</div>
+<code>
+$db->updateSetting('id_field_name', 'uuid');
+
+// retrieve for a row in a table by id (if it exists)
+$customer = $db->rowById('customers', 'ab06f63e-8fe7-11ec-a514-5405db7aad56');
+
+// the SQL that will process will be something like "SELECT * FROM customers where uuid=:uuid limit 1;", ":uuid" will be bound to "ab06f63e-8fe7-11ec-a514-5405db7aad56" using PDO
+// $customer will be set if the record exists
+</code>
+
+<br><br><br>
+
+ 
+    <h2>max_records_per_insert_query</h2>
+    <ul>
+        <li>maximum number of records to include in each SQL query generated by insertMultiple() and insertMultipleFieldsValues()</li>
+        <li>higher values can be more efficient because fewer queries are needed, but use more system resources and increase the chance of exceeding system limitations</li>
+        <li>the default (100) is a very conservative value; values in the tens of thousands
+            will likely work fine for typical data</li>
+        <li>integer; default = <b>100</b></li>
+    </ul>
+    <div>max_records_per_insert_query is set to <b>1000</b>.</div>
+<code>
+$db->updateSetting('max_records_per_insert_query', 1000);
+
+// $customers is an array of data for 10,000 customers with the following format:
+// $customers = array(
+//      array('first_name'=>'Joe', last_name=>'Jones', username=>"joe_jones"),
+//      array('first_name'=>'Sally', last_name=>'Williams', username=>"s_williams"),
+//      ... [more records with the same formatting] ...
+// );
+
+// single function call to insert all
+$isSuccess = $db->insertMultiple('customers', $customers);
+
+// behind the scenes, the function will generate SQL to insert all data. Based on the setting, 1,000 will be 
+//      inserted per query. So to insert all 10,000 customers, 10 queries will be sent to the database
+// if all records are successfully inserted, $isSuccess will ge true
+</code>
+
+
+<br><br><br>
+
+
+
+
+<h2>delete_and_update_require_where</h2>
+    <ul>
+        <li>DELETE and UPDATE queries require a WHERE clause</li>
+        <li>used to avoid accidentally deleting or updating all rows in a table</li>
+        <li>just a simple check that the string "WHERE" is in the query, could still allow a DELETE or UPDATE in certain rare cases: "DELETE from places_where_ive_been;" or "UPDATE books SET title='Where the Wild Things Are';"</li>
+        <li>to affect all rows in a table, set WHERE clause to "true", ex: "DELETE FROM places_where_ive_been WHERE true;"</li>     
+        <li>true or false (boolean); default = <b>true</b></li>
+    </ul>
+    <div>delete_and_update_require_where is set to <b>false</b>.</div>
+<code>
+$db->updateSetting('delete_and_update_require_where', false);
+
+// DELETE query with no where clause
+$isSuccess = $db->query('DELETE FROM customers;');
+
+// all rows in the table will be deleted
+// $isSuccess is true
+</code>
+<br>
+<div>delete_and_update_require_where is set to <b>true</b>.</div>
+<code>
+$db->updateSetting('delete_and_update_require_where', true);
+
+// DELETE query with no where clause
+$customer = $db->query('DELETE FROM customers;');
+
+// an error will be generated. the query will not be processed (no rows deleted)
+// $isSuccess is false
+
+// DELETE query with where clause that will delete all rows
+$customer = $db->query('DELETE FROM customers WHERE true;');
+
+// all rows in the table will be deleted
+// $isSuccess is true
+</code>
+
+
+<br><br><br>
+
+
+<h2>max_rows_for_table_display</h2>
+    <ul>
+        <li>the maximum number of rows to display as an HTML table when outputting an array using the display() function</li>
+        <li>if an array has more rows, the array is displayed using PHP's var_dump() function</li>
+        <li>integer; default = <b>1000</b></li>
+    </ul>
+    <div>max_rows_for_table_display is set to <b>99</b>.</div>
+<code>
+$db->updateSetting('max_rows_for_table_display', 99);
+
+// assume that there are more than 100 records in the $customers table
+
+// retrieve up to 99 customer records
+// since there are more than 100 records in the table, the $customers array will have 99 rows
+$customers = $db->all('select * from customers limit 99;');
+
+// 99 rows will display in a table
+$db->display($customers);
+
+// retrieve up to 100 customer records
+// since there more than 100 records in the table, the $customers array will have 100 rows
+$customers = $db->all('select * from customers limit 100;');
+
+// trying to display 100 rows, but max_rows_for_table_display is set to 99 rows
+// the function will instead use PHP's var_dump() function to display the array
+$db->display($customers);
+</code>
+
+
+
+<br><br><br>
+
+
+<h2>save_query_run_time</h2>
+    <ul>
+        <li>track processing start and end times (to calculate duration later)</li>
+        <li>useful for testing, but adds some overhead, so normally set to false in production unless the information
+            is needed for another purpose, such as analysis</li>
+        <li>true or false (boolean); default = <b>false</b></li>
+    </ul>
+
+    <div>save_query_run_time is set to <b>false</b>. query start and end times will NOT be tracked.</div>
+<code>
+$db->updateSetting('save_query_run_time', false);
+
+// run a query
+$customer = $db->row('SELECT * from customers limit 1;');
+
+// display information on the most recent query
+$db->displayLastQueryInfo('settingDoesNotExist', true);
+// output information will NOT include "duration"
+</code>
+    <br>
+    <div>save_query_run_time is set to <b>true</b>. query start and end times will be tracked.</div>
+<code>
+$db->updateSetting('save_query_run_time', true);
+
+// run a query
+$customer = $db->row('SELECT * from customers limit 1;');
+
+// display information on the most recent query
+$db->displayLastQueryInfo('settingDoesNotExist', true);
+// output information will include "duration"
+</code>
+
+</body>
+
+</html>

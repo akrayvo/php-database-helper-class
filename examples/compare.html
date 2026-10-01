@@ -20,9 +20,9 @@
 <code>
 // connect to the database
 $pdo = new PDO(
-    'mysql:host=localhost;dbname=my_database;charset=utf8mb4',
-    'username',
-    'password'
+    'mysql:host=localhost;dbname=your_db;charset=utf8mb4',
+    'your_username',
+    'your_password'
 );
 </code>
 
@@ -141,7 +141,7 @@ $customer = $db->row($sql, $binds);
 
 <br><br><br>
 
-<h2>Get One Record By ID</h2>
+<h2>Get Record By ID</h2>
 <br>
 
 <h3>Native PHP</h3>
@@ -258,7 +258,7 @@ $username = $db->oneById('customers', 25, 'username');
 <br><br><br>
 
 
-<h2>Insert Record</h2>
+<h2>Insert Record and get ID</h2>
 <br>
 
 <h3>Native PHP</h3>
