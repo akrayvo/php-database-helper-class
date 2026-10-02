@@ -293,6 +293,7 @@ function viewMovies($message = '')
     // display the list of movies
 
     $movies = getMovies();
+
     pageHeader();
 ?>
     <h2>Movies</h2><br>

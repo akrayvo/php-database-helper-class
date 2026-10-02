@@ -1727,7 +1727,7 @@ class DatabaseHelper
                 "pre.db_class_preview1 { padding: 8px 4px; border:1px solid #777;padding: 0; } " .
                 ".db_class_preview1 pre.db_class_preview1 { border: none; padding:0; margin:0 } " .
                 "table.db_class_preview1 { border-collapse: collapse; } " .
-                "table.db_class_preview1 td, table.db_class_preview1 th { padding: 6px 10px; border: 1px solid #777; } " .
+                "table.db_class_preview1 td, table.db_class_preview1 th { padding: 6px 10px; border: 1px solid #777; color:#000; } " .
                 "table.db_class_preview1 td td { padding: 4px; border: 1px solid #AAA; } " .
                 ".db_class_preview1 table.db_class_preview1 { margin:0 } " .
                 "</style>\n";
