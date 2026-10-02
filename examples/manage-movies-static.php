@@ -1,7 +1,7 @@
 <?php
 
 /**
- * DatabaseHelper example - Movie database
+ * DatabaseHelper example - Movie database (static version)
  *
  * this page is an example of using the DatabaseHelper class to create a simple
  * movie database management application. it demonstrates adding, editing, viewing,
@@ -34,10 +34,10 @@ ini_set('display_errors', '1');
 ini_set('display_startup_errors', '1');
 error_reporting(E_ALL);
 
-require_once('../DatabaseHelper.class.php');
+require_once('../DatabaseHelper.class.static.php');
 
 // database connection
-$db = new DatabaseHelper(
+Db::connect(
     'db_class_movies',  // table
     'localhost',        // host
     'root',             // username
@@ -62,7 +62,7 @@ function getMovies()
         GROUP BY M.id
         ORDER BY M.title ASC, M.release_date DESC';
 
-    return $db->all($sql);
+    return Db::all($sql);
 }
 
 /**
@@ -73,9 +73,9 @@ function getMovie($movieId)
     global $db;
 
      // query all information for a single movie, then add genres and actors
-    $movie = $db->rowById('movies', $movieId);
-    $movie['actors'] = $db->col('SELECT actor_id FROM movie_actor WHERE movie_id=:movie_id;', array('movie_id' => $movieId));
-    $movie['genres'] = $db->col('SELECT genre_id FROM movie_genre WHERE movie_id=:movie_id;', array('movie_id' => $movieId));
+    $movie = Db::rowById('movies', $movieId);
+    $movie['actors'] = Db::col('SELECT actor_id FROM movie_actor WHERE movie_id=:movie_id;', array('movie_id' => $movieId));
+    $movie['genres'] = Db::col('SELECT genre_id FROM movie_genre WHERE movie_id=:movie_id;', array('movie_id' => $movieId));
 
     // check that the movie actually exists. show an error if not.
     if (empty($movie)) {
@@ -99,7 +99,7 @@ function getActorList()
     $keyField = 'id';
     $valueField = 'name';
 
-    return $db->col($sql, $binds, $keyField, $valueField);
+    return Db::col($sql, $binds, $keyField, $valueField);
 }
 
 function getGenreList()
@@ -112,9 +112,12 @@ function getGenreList()
     $keyField = 'id';
     $valueField = 'genre';
 
-    return $db->col($sql, $binds, $keyField, $valueField);
+    return Db::col($sql, $binds, $keyField, $valueField);
 }
 
+/**
+ * @param int $movieId
+*/
 function deleteMovie()
 {
     global $db;
@@ -128,12 +131,12 @@ function deleteMovie()
     $message = '';
     if (!empty($movie)) {
         // delete the movie
-        $isSuccess = $db->deleteById('movies', $movieId);
+        $isSuccess = Db::deleteById('movies', $movieId);
         
         if ($isSuccess) {
             // the movie was successfully deleted, delete associated data and set the message.
-            $db->query('DELETE FROM movie_actor WHERE movie_id=:movie_id;', array('movie_id' => $movieId));
-            $db->query('DELETE FROM movie_genre WHERE movie_id=:movie_id;', array('movie_id' => $movieId));
+            Db::query('DELETE FROM movie_actor WHERE movie_id=:movie_id;', array('movie_id' => $movieId));
+            Db::query('DELETE FROM movie_genre WHERE movie_id=:movie_id;', array('movie_id' => $movieId));
             $message = 'Movie Deleted: ' . $movie['title'];
         }
     }
@@ -166,7 +169,7 @@ function saveMovie()
         //      we could also send different queries depending on we have to check id (edit) or not (add)
         $sql = 'SELECT id FROM movies WHERE title=:title AND release_date=:release_date AND id<>:id limit 1;';
         $binds = array(':title' => $title, ':release_date' => $releaseDate, ':id' => $movieId);
-        $existingMovieId = $db->one($sql, $binds);
+        $existingMovieId = Db::one($sql, $binds);
         if ($existingMovieId) {
             $errors[] = 'Movie already exists.';
         }
@@ -183,20 +186,20 @@ function saveMovie()
     $values = array(
         'title' => $title,
         'release_date' => $releaseDate,
-        'updated_date' => $db->raw('NOW()')
+        'updated_date' => Db::raw('NOW()')
     );
 
     $message = '';
     if ($movieId) {
         // update existing
-        $isSuccess = $db->updateById('movies', $values, $movieId);
+        $isSuccess = Db::updateById('movies', $values, $movieId);
         if ($isSuccess) {
             $message = "Movie Updated: " . $title;
         }
     } else {
         // add new
         // the insert ID is returned, we will use this to add associated data
-        $movieId = $db->insert('movies', $values);
+        $movieId = Db::insert('movies', $values);
         if ($movieId) {
             $message = "Movie Added: " . $title;
         }
@@ -208,7 +211,7 @@ function saveMovie()
         // get all actor id's with records already in the movie_actor table for this movie
         $sql = 'SELECT actor_id FROM movie_actor WHERE movie_id=:movie_id;';
         $binds = array(':movie_id' => $movieId);
-        $movieActorIds = $db->col($sql, $binds);
+        $movieActorIds = Db::col($sql, $binds);
 
         // after adding we're going to delete all records not in the $keepIds array (associated records removed)
         $keepIds = array();
@@ -230,25 +233,25 @@ function saveMovie()
         if (!empty($inserts)) {
             // at least 1 record is to be inserted
             // insert records
-            $db->insertMultiple('movie_actor', $inserts);
+            Db::insertMultiple('movie_actor', $inserts);
         }
 
         $binds = array(':movie_id' => $movieId);
         if (empty($keepIds)) {
             // no records are set (no checkboxes clicked), remove all records for the movie
-            $db->query('DELETE FROM movie_actor where movie_id=:movie_id;', $binds);
+            Db::query('DELETE FROM movie_actor where movie_id=:movie_id;', $binds);
         } else {
             // some records are set(checkboxes clicked), remove all records for the movie other than the set ones
             // note that values originally generated by the user are added directly to the query rather than using PDO binding. in this case, all
             //      values have been converted to integers, so this isn't a security issue (no chance of SQL injection).
-            $db->query('DELETE FROM movie_actor where movie_id=:movie_id and actor_id NOT IN (' . implode(',', $keepIds) . ');', $binds);
+            Db::query('DELETE FROM movie_actor where movie_id=:movie_id and actor_id NOT IN (' . implode(',', $keepIds) . ');', $binds);
         }
 
 
         // get all genre id's with records already in the movie_genre table for this movie
         $sql = 'SELECT genre_id FROM movie_genre WHERE movie_id=:movie_id;';
         $binds = array(':movie_id' => $movieId);
-        $movieGenreIds = $db->col($sql, $binds);
+        $movieGenreIds = Db::col($sql, $binds);
 
         // after adding we're going to delete all records not in this $keepIds array (associated records removed)
         $keepIds = array();
@@ -268,16 +271,16 @@ function saveMovie()
         if (!empty($inserts)) {
             // at least 1 record is to be inserted
             // insert records
-            $db->insertMultiple('movie_genre', $inserts);
+            Db::insertMultiple('movie_genre', $inserts);
         }
 
         $binds = array(':movie_id' => $movieId);
         if (empty($keepIds)) {
             // no records are set (no checkboxes clicked), remove all records for the movie
-            $db->query('DELETE FROM movie_genre where movie_id=:movie_id;', $binds);
+            Db::query('DELETE FROM movie_genre where movie_id=:movie_id;', $binds);
         } else {
             // some records are set(checkboxes clicked), remove all records for the movie other than the set ones
-            $db->query('DELETE FROM movie_genre where movie_id=:movie_id and genre_id NOT IN (' . implode(',', $keepIds) . ');', $binds);
+            Db::query('DELETE FROM movie_genre where movie_id=:movie_id and genre_id NOT IN (' . implode(',', $keepIds) . ');', $binds);
         }
     }
 
