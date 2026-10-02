@@ -547,10 +547,10 @@ switch ($method) {
         movieForm();
         break;
     case "save_movie":
-        saveMovie($movieId);
+        saveMovie();
         break;
     case "delete_movie":
-        deleteMovie($movieId);
+        deleteMovie();
         break;
     default:
         viewMovies();
