@@ -153,6 +153,16 @@ $id = 15;
 $isSuccess = $db->deleteById('customers', $id);
 ```
 
+### Add an SQL statement to an array of values to INSERT or UPDATE
+```
+// the raw() function makes the string process as raw SQL rather than as a literal value
+$values = array(
+    'last_name' => 'Johnson', 
+    'signup_date'=> $db->raw('CURDATE()')
+    );
+$insertId = $db->insert('customers', $values);
+```
+
 ## Using the class vs. standard HP/PDO
 
 ### Connect to Database
@@ -292,245 +302,147 @@ $newCustomerId = $db->insert($table, $fields);
 
 ## Settings
 
-all settings are boolean (true or false) and can be set using the updateSetting function
+All settings can be set using the updateSetting() function. for example:
 ```
-<?php
-$form = new FormHelper();
-$form->updateSetting('addIdAttributeFromName', true);
-$form->updateSetting('passedStripTags', false);
-?>
+$db->updateSetting('output_error_debugging', true);
 ```
 
-### exitProgramOnFailure
-* end program on settings/configuration error?
-* helpful for development, should be false in production
-* default = false
+### connection_error_action
+
+* how to handle a connection or initialization error
+* invalid configuration settings are also treated as initialization errors since they could keep data from processing as expected
+* if changing the default value, change it in the settings array of the class file for connection errors. the database connection is made in the constructor, so updateSetting() cannot be used to change this setting until after the connection has been established.
+* valid values: 'exit', 'continue_without_database'
+    * **exit**: completely end the program
+    * **continue_without_database**: the program continues, but subsequent database functions will not execute. functions that modify data will do nothing and functions that return data will return empty results
+* note that there is no option to continue_with_database
+* predefined options; default = **exit**
 
 
-### addIdAttributeFromName
-* automatically add an "id" attribute with the same value as "name"?
-* does not affect radio inputs because they can have multiple elements with the same "name" attribute
-* does not affect buttons because the class does not automatically add a name "attribute" to buttons
-* default = false
+### query_error_action
 
-```
-// addIdAttributeFromName = false
-// trying to retrieve a passed variable with invalid parameters (both POST and GET)
-$form->updateSetting('exitProgramOnFailure', false);
-$name = $form->getPassed('first_name', array('post','get'));
-// despite error, program will continue with no output error message
-
-// addIdAttributeFromName = true
-// trying to retrieve a passed variable with invalid parameters (both POST and GET)
-$form->updateSetting('exitProgramOnFailure', true);
-$name = $form->getPassed('first_name', array('post','get'));
-// will output an error message and end the program
-```
-
-### selectOptionValueEqualsDisplayText
-* in a select (dropdown), use each option's display text as its value
-* if false, the passed options parameter should be an associative array: $options = array('blue'=>'Blue', 'light_green'=>'Light Green');
-* if true, the passed options parameter can be an indexed (non-associative) array since the key is ignored: $options = array('Blue', 'Light Green');
-* default = false
-```
-$options = array('NY'=>'New York', 'OH'=>'Ohio');
-
-// selectOptionValueEqualsDisplayText = false
-$form->updateSetting('selectOptionValueEqualsDisplayText', false);
-$form->select('state', $options);
-// <select name="state"><option value="NY">New York</option><option value="OH">Ohio</option></select>
-
-$form->updateSetting('selectOptionValueEqualsDisplayText', true);
-$form->select('state', $options);
-// <select name="state"><option value="New York">New York</option><option value="Ohio">Ohio</option></select>
-```
-
-### passedTrim
-* trim whitespace from the beginning and end of passed values
-* used in the getPassed() function
-* default = true
-```
-// my_text = "  My Text  " was passed from form
-
-// passedTrim = false | beginning and end whitespace will be retained
-$form->updateSetting('passedTrim', false);
-var_dump($form->getPassed("my_text"));
-// output string(11) "   My Text   "
-
-// passedTrim = true | beginning and end whitespace will be removed
-$form->updateSetting('passedTrim', true);
-var_dump($form->getPassed("my_text"));
-// output string(7) "My Text"
-```
+* how to handle a query error
+* valid values: 'exit', 'continue_without_database', 'continue_with_database'
+    * **exit**: completely end the program
+    * **continue_without_database**: the program continues, but subsequent database functions will not execute. functions that modify data will do nothing and functions that return data will return empty results
+    * **continue_with_database**: the program continues and subsequent database functions will continue normally      
+* predefined options; default = **continue_without_database**
 
 
-### passedStripTags
-* remove HTML tags and script/style blocks from a string
-* used in the getPassed() function
-* default = true
-```
-// my_text = "<b><i>My Text</i></b>" was passed from form
+###error_output_html
 
-// passedStripTags = false | HTML tags will be retained
-$form->updateSetting('passedStripTags', false);
-var_dump($form->getPassed("my_text"));
-// output string(21) "<b><i>My Text</i></b>"
-
-// passedStripTags = true | HTML tags will be removed
-$form->updateSetting('passedStripTags', true);
-var_dump($form->getPassed("my_text"));
-// output string(7) "My Text"
-```
+* HTML that will be displayed when an error causes the program to exit
+* is only displayed when **query_error_action** or **connection_error_action** are set to "**exit**"
+* text; default = "**&lt;div&gt;There was an error loading the page&lt;/div&gt;**"
 
 
-### passedConvertToStandardCharacters
-* converts non-standard (non-ASCII) characters in passed values
-* used in the getPassed() function
-* replaces characters with equivalents when possible, otherwise replaces the character with a dash
-* default = false
-```
-// my_text = "Déjà Vu" was passed from form
+###output_error_debugging
 
-// passedConvertToStandardCharacters = false | non-standard will be retained
-$form->updateSetting('passedConvertToStandardCharacters', false);
-var_dump($form->getPassed("my_text"));
-// output string(9) "Déjà Vu"
-
-// passedConvertToStandardCharacters = true | non-standard will be replaced
-$form->updateSetting('passedConvertToStandardCharacters', true);
-var_dump($form->getPassed("my_text"));
-// output string(7) "Deja Vu"
-```
+* output debugging information to the screen when an error causes the program to exit
+* debugging information is only displayed when **query_error_action** or **connection_error_action** are set to "**exit**"
+* should be set to false in production environments
+* true or false (boolean); default = **false**
 
 
-### returnNullIfUnavailable
-* when retrieving a passed value, return NULL when variable is not available (not set or invalid)
-* used in the getPassed() function
-* by default, when a variable is not set, the return value is "" (empty string), 0, or an empty array depending on if a flag is set to return as an int, float, or array. if returnNullIfUnavailable is set to true, null will be returned instead
-* will also return NULL when a variable doesn't match the settings. for instance, the 'array' flag is set, but the value is not an array
-* default = false
-```
-// no POST or GET data passed
+###return_null_on_error
 
-// returnNullIfUnavailable = false
-$form->updateSetting('returnNullIfUnavailable', false);
-$value = $form->getPassed('variable_is_not_set');
-var_dump($value);
-// output: string(0) ""
-
-// returnNullIfUnavailable = true
-$form->updateSetting('returnNullIfUnavailable', true);
-$value = $form->getPassed('variable_is_not_set');
-var_dump($value);
-// output: NULL
-```
+* on query error, return null
+* affects all(), row(), column(), one(), rowById(), and oneById()
+* default behavior is to return an empty, a blank string, or false depending on the function
+* allows the developer to distinguish between a valid query that returns no results and a query error
+* true or false (boolean); default = **false**
 
 
-### returnHtml
-* return the HTML elements as a string?
-* default = false
+###id_field_name
 
-```
-// returnHtml = false | no echo is required to display output
-$form->updateSetting('returnHtml', false);
-echo $form->text("first_name");
-// output: <input type="text" name="first_name" value="">
+* the unique identifier column in tables
+* used by all "ById" functions to find a record by identifier
+* will usually not need to be changed since most databases use "id" as the identifier field name
+* text; default = "**id**"
 
-// returnHtml = true | echo is required to display output
-$form->updateSetting('returnHtml', true);
-echo $form->text("first_name");
-// output: <input type="text" name="first_name" value="">
-```
+###max_records_per_insert_query
 
-     
-### xhtmlStyleOutput
-* output XHTML-style HTML
-* closes self-closing elements and boolean attributes (selected, readonly, etc) will have values that match the attribute
-* default = false
-
-```
-// xhtmlStyleOutput = false
-$form->updateSetting('xhtmlStyleOutput', false);
-$form->text('first_name', '', array('readonly'));
-// <input type="text" name="first_name" value="" readonly>
-
-// xhtmlStyleOutput = true
-$form->updateSetting('xhtmlStyleOutput', true);
-$form->text('first_name', '', array('readonly'));
-// <input type="text" name="first_name" value="" readonly="readonly" />
-```
+* maximum number of records to include in each SQL query generated by insertMultiple() and insertMultipleFieldsValues()
+* higher values can be more efficient because fewer queries are needed, but use more system resources and increase the chance of exceeding system limitations
+* the default (100) is a very conservative value; values in the tens of thousands
+            will likely work fine for typical data
+* integer; default = **100**
 
 
-## Using form tag attributes
-All form element functions include a `$moreAttributes` parameter. It takes an array of attributes with the $key as the attribute name and the value being the value.
+###delete_and_update_require_where
 
-If the key is numeric, it will be handled as a boolean attribute (with no value such as `readonly`, `disabled`, `checked`, etc.).
-
-Common attributes would include `id`, `class`, `style`, `placeholder`, etc.
-
-```
-$moreAttributes = array('style'=>'padding:20px;', 'placeholder'=>'Name', 'readonly');
-$form->text('name', '', $moreAttributes);
-```
-HTML output
-```
-<input type="text" name="name" value="" style="padding:20px" placeholder="Name" readonly>
-```
+* DELETE and UPDATE queries require a WHERE clause
+* used to avoid accidentally deleting or updating all rows in a table
+* just a simple check that the string "WHERE" is in the query, could still allow a DELETE or UPDATE in certain rare cases: "DELETE from places_where_ive_been;" or "UPDATE books SET title='Where the Wild Things Are';"
+* to affect all rows in a table, set WHERE clause to "true", ex: "DELETE FROM places_where_ive_been WHERE true;"     
+* true or false (boolean); default = **true**
 
 
-## Passing Variables
+###max_rows_for_table_display
 
-Processing forms generally requires handling data passed from POST or GET. These functions check that passed data exists, get the value, manipulate it, and return it.
+* the maximum number of rows to display as an HTML table when outputting an array using the display() function
+* if an array has more rows, the array is displayed using PHP's var_dump() function
+* integer; default = **1000**
 
-* `getPassed($var, $flags = array())` - get variable passed through POST, GET, or COOKIE. by default will check POST and return the value if set, then check GET and return the value if set. a COOKIE value is only returned when the `cookie` flag is set 
-* `getPost($var, $flags = array())` - get variable passed through POST
-* `getGet($var, $flags = array())` - get variable passed through GET
 
-# Flags
-* `post` - retrieve the variable from POST only
-* `get` - retrieve the variable from GET only
-* `cookie` - retrieve the variable from COOKIE only. note that COOKIE values are retrievable since they can be processed along with form data. For instance when saving form data to a database or processing an email form, a COOKIE value can be checked to determine if the user is logged in and that info can be processed.
-* `int` - convert retrieved value to an integer
-* `float` - convert retrieved value to a float
-* `array` - process value as an array, can be used with int or float to process an array of integers or floats
-* `strip-tags`, `no-strip-tags` - override the "passedStripTags" setting. see setting for details
-* `trim`, `no-trim` - override the "passedTrim" setting. see setting for details
-* `convert`, `no-convert` - override the "passedConvertToStandardCharacters" setting. see setting for details
+###save_query_run_time
 
-# Usage
+* track processing start and end times (to calculate duration later)
+* useful for testing, but adds some overhead, so normally set to false in production unless the information
+            is needed for another purpose, such as analysis
+* true or false (boolean); default = **false**
 
-* flags can be passed as an array or a string separated by commas or spaces. ex: `$flags = array('post', 'float');  or  $flags = "post float";  or   $flags = "post,float";`
+
+
 
 ## Functions
 
 ### Settings
 * `updateSetting($setting, $value)` - set configuration variables
-### String Manipulation
-* `htmlEscape($string)` - escape a string to display in HTML
-### Get Passed Data
-* `getPassed($var, $flags = array())` - retrieve a value from $_GET, $_POST, or $_COOKIE. default functionality is check $_POST, then check $_GET
-* `getPost($var, $flags = array())` - retrieve a value from $_POST
-* `getGet($var, $flags = array())` - retrieve a value from $_GET
-### input elements
-* `hidden($name, $value = '', $moreAttributes = array())` - `<input type="hidden">`
-* `text($name, $value = '', $moreAttributes = array())` - `<input type="text">`
-* `color($name, $value = '', $moreAttributes = array())` - `<input type="color">`
-* `number($name, $value = '', $moreAttributes = array())` - `<input type="number">`
-* `range($name, $min, $max, $value = '', $moreAttributes = array())` - `<input type="range">`
-* `email($name, $value = '', $moreAttributes = array())` - `<input type="email">`
-* `tel($name, $value = '', $moreAttributes = array())` - `<input type="tel">`
-* `date($name, $value = '', $moreAttributes = array())` - `<input type="date">`
-* `password($name, $moreAttributes = array())` - `<input type="password">`
-* `checkbox($name, $isChecked = false, $value = 1, $moreAttributes = array())` - `<input type="checkbox">`
-* `radio($name, $value, $selectedValue = '', $moreAttributes = array())` - `<input type="radio">`
-* `submit($value = '', $name = '',  $moreAttributes = array())` - `<input type="submit">`
-* `reset($value = '', $name = '',  $moreAttributes = array())` - `<input type="reset">`
-* `input($type, $name, $value = '', $moreAttributes = array())` - `<input>` (used for other HTML inputs: url, phone, etc)
 
-### Other form elements
-* `formStart($action = '', $method = '', $moreAttributes = array())` - `<form>`
-* `formEnd()` - `</form>`
-* `textarea($name, $value = '', $moreAttributes = array())` - `<textarea>`
-* `button($html = 'Submit', $moreAttributes = array())` - `<button>`
-* `select($name, $options, $value = null, $moreAttributes = array())` - `<select><option>`
-* `selectByRecordSet($name, $records, $valueKey, $displayKey, $emptyText = '', $value = null, $moreAttributes = array())` - `<select><option>`
+### Get Last Error and Connection Info
+* `lastError()` - return the last (most recent) error
+* `hasDbConnection()` - return if a database connection has been made or not
+
+### Get Last Query Info
+* `insertId()` -  get the identifier of the last query
+* `rowCount()` - get the number of rows affected by the last query
+* `error()` - get the error from the last query
+* `success()` - return if the last query was successful
+* `duration()` - return the duration of the last query in seconds
+* `sql()` - return the last SQL query
+* `binds()` - return the PDO binds for the last query
+
+### Development / Debugging
+
+* `displayLastQueryInfo()` - display information about the last query
+* `info()` - shortcut for displayLastQuery
+* `display($value)` - display a value for debugging
+* `tables()` - output a list of all tables in the database
+* `fields($table)` - output a list of all fields in a table
+
+### Retrieve Data From Raw SQL
+* `all($sql, $binds = array(), $keyField = '')` - execute SQL and return all result rows
+* `row($sql, $binds = array())` - execute SQL and return the first row
+* `column($sql, $binds = array(), $keyField = '', $valueField = '')` - execute SQL and return all values from a single column
+* `col($sql, $binds = array(), $keyField = '', $valueField = '')` - shortcut for the column function
+* `one($sql, $binds = array(), $valueField = '')` - execute SQL and return a single value from the first result row
+
+### Modify Database (Insert, Update, Delete, Alter, etc) From Raw SQL
+* `query($sql, $binds = array())` - execute SQL when no result values are needed
+
+### Retrieve Data From Parameters (converted to SQL)
+* `count($table)` - return the number of rows in a table
+* `rowById($table, $id)` - get a row from a table using its identifier field (usually "id")
+* `oneById($table, $id, $field)` - get a single value from a table using its identifier field (usually "id")
+
+### Modify Database (Insert, Update, Delete, Alter, etc) From Parameters (converted to SQL)
+* `insert($table, $values)` - insert a new row into a table
+* `insertMultiple($table, $rows)` - insert a new row into a table
+* `insertMultipleFieldsValues($table, $fields, $dataRows)` - insert multiple new rows into a table using a separate array of field names
+* `update($table, $values, $whereSql, $whereBinds = array())` - update rows in a table
+* `updateById($table, $values, $id)` - update a row in a table using its identifier field (usually "id")
+* `deleteById($table, $id)` - delete a row from a table using its identifier field (usually "id")
+
+### SQL Expression Helpers
+* `raw($value)` - mark a value as raw SQL instead of a value to be bound

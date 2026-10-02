@@ -106,16 +106,16 @@ class DatabaseHelper
     // information on the current/previous database operation
     // will be reset when a new query starts processing
     private $insertId = 0;
-    private $sql = '';
-    private $isSuccess = false;
-    // note that rowCount() should be consistent for UPDATE, DELETE, and INSERT queries,
+    // note that Mysql's rowCount() should be consistent for UPDATE, DELETE, and INSERT queries,
     //      but for other queries the returned value may depend on the PHP version, database driver, and settings
     private $rowCount = 0;
-    private $returnType = '';
+    private $queryError = '';
+    private $isSuccess = false;
+    private $sql = '';
     private $binds = array();
+    private $returnType = '';
     private $keyField = '';
     private $valueField = '';
-    private $queryError = '';
     private $startTime = 0;
     private $endTime = 0;
 
@@ -162,10 +162,111 @@ class DatabaseHelper
         $this->skipQueries = false;
     }
 
+
+    // -----------------------------------------------------------------------------
+    // Settings
+    // -----------------------------------------------------------------------------
+
+    /**
+     * set a configuration setting
+     * the setting name must exist in the $settings array
+     * the value must be valid for the specified setting
+     * example: $db->updateSetting('save_query_run_time', true);
+     * supports chaining: $db->updateSetting('save_query_run_time', true)->updateSetting('connection_error_action', 'exit');
+     * 
+     * @param string $setting
+     * @param mixed $value
+     * @return DatabaseHelper
+     */
+    public function updateSetting($setting, $value)
+    {
+        if (!isset($this->settings[$setting])) {
+            $this->exitProgramError("DatabaseHelper updateSetting() received invalid setting: " . $setting, true);
+            return $this;
+        }
+
+        // valid settings 
+        //      boolean = save_query_run_time, output_error_debugging, return_null_on_error, delete_and_update_require_where
+        //      integer = max_records_per_insert_query, max_rows_for_table_display
+        //      string = connection_error_action, query_error_action, error_output_html, id_field_name
+
+        if (
+            $setting === 'save_query_run_time' ||
+            $setting === 'output_error_debugging' ||
+            $setting === 'return_null_on_error' ||
+            $setting === 'delete_and_update_require_where'
+        ) {
+            if (empty($value) || $value === 'false') {
+                $value = false;
+            } else {
+                $value = true;
+            }
+        } elseif ($setting === 'max_records_per_insert_query' || $setting === 'max_rows_for_table_display') {
+            if (!is_numeric($value)) {
+                $this->exitProgramError("DatabaseHelper updateSetting() value must be a number: " . $setting, true);
+                return $this;
+            }
+            $value = intval($value);
+
+            // upper limit set to 10k
+            if ($setting === 'max_records_per_insert_query' && ($value < 1 || $value > 10000)) {
+                $this->exitProgramError('value is invalid for setting: max_records_per_insert_query. value must be between 1 and 10,000', true);
+                return $this;
+            }
+
+            // upper limit set to 10k
+            // lower limit set to 2. showing 1 row defeats the purpose and users could set 1 thinking that they're setting a boolean value
+            if ($setting === 'max_rows_for_table_display' && ($value < 2 || $value > 10000)) {
+                $this->exitProgramError('value is invalid for setting: max_rows_for_table_display. value must be between 2 and 10,000', true);
+                return $this;
+            }
+        } elseif ($setting === 'connection_error_action') {
+            // only valid values
+            if ($value !== 'exit' && $value !== 'continue_without_database') {
+                $this->exitProgramError('value is invalid for setting: connection_error_action. value must be "exit" or "continue_without_database"', true);
+                return $this;
+            }
+        } elseif ($setting === 'query_error_action') {
+            // only valid values
+            if ($value !== 'exit' && $value !== 'continue_without_database' && $value !== 'continue_with_database') {
+                $this->exitProgramError('value is invalid for setting: query_error_action. value must be "exit", "continue_without_database", or "continue_with_database"', true);
+                return $this;
+            }
+        } elseif ($setting === 'error_output_html') {
+            if (!is_string($value)) {
+                $this->exitProgramError('value is invalid for setting: error_output_html. value must be "string" (' . gettype($value) . ' passed)', true);
+                return $this;
+            }
+        } elseif ($setting === 'id_field_name') {
+            if (!is_string($value)) {
+                $this->exitProgramError('value is invalid for setting: id_field_name. value must be "string" (' . gettype($value) . ' passed)', true);
+                return $this;
+            }
+            $value = $this->checkIdentifier($value, 'id_field_name setting');
+            if (empty($value)) {
+                $this->exitProgramError('invalid id_field_name setting', true);
+                return $this;
+            }
+        } else {
+            // should not get here. this is just a failsafe in case a valid settings is not checked
+            $this->exitProgramError("DatabaseHelper updateSetting() setting not available: " . $setting, true);
+            return $this;
+        }
+
+        $this->settings[$setting] = $value;
+
+        return $this;
+    }
+
+
+    // -----------------------------------------------------------------------------
+    // Get Last Error and Connection Info
+    // -----------------------------------------------------------------------------
+
     /**
      * return the last (most recent) error
      * note that this is NOT the error from the last query
-     * will include connection errors (connection and initialization) and query errors (pre check and query iteself)
+     * will include connection errors (connection and initialization) and query errors (pre check and query itself)
      * example: $error = $db->lastError();
      * 
      * @return string
@@ -182,7 +283,6 @@ class DatabaseHelper
         return '';
     }
 
-
     /**
      * return if a database connection has been made or not
      * example: $hasDbConnection = $db->hasDbConnection();
@@ -194,37 +294,54 @@ class DatabaseHelper
         return $this->hasDbConnection;
     }
 
-    /**
-     * get the number of rows affected by the last query
-     * example: $rowCount = $db->lastRowCount();
-     * 
-     * @return integer
-     */
-    public function lastRowCount()
-    {
-        return $this->rowCount;
-    }
+
+    // -----------------------------------------------------------------------------
+    // Get Last Query Info
+    // -----------------------------------------------------------------------------
 
     /**
      * get the identifier of the last query
      * will be 0 unless the last query was a successful insert
-     * example: $id = $db->lastInsertId();
+     * example: $id = $db->insertId();
      * 
      * @return integer
      */
-    public function lastInsertId()
+    public function insertId()
     {
         return $this->insertId;
     }
 
     /**
+     * get the number of rows affected by the last query
+     * example: $rowCount = $db->rowCount();
+     * 
+     * @return integer
+     */
+    public function rowCount()
+    {
+        return $this->rowCount;
+    }
+
+    /**
+     * get the error from the last query
+     * note that this differs from the last error
+     * example: $errorText = $db->error();
+     * 
+     * @return string
+     */
+    public function error()
+    {
+        return $this->queryError;
+    }
+
+    /**
      * return if the last query was successful
      * will be boolean (true or false)
-     * example: $isSuccess = $db->lastQuerySuccessful();
+     * example: $isSuccess = $db->success();
      * 
      * @return boolean
      */
-    public function lastQuerySuccessful()
+    public function success()
     {
         if ($this->isSuccess) {
             return true;
@@ -233,16 +350,46 @@ class DatabaseHelper
     }
 
     /**
-     * shortcut for lastQuerySuccessful()
-     * example: $isSuccess = $db->success();
+     * return the duration of the last query in seconds
+     * example: $durationInSeconds = $db->duration();
      * 
-     * @return boolean
+     * @return integer
      */
-    public function success()
+    public function duration()
     {
-        return $this->lastQuerySuccessful();
+        if ($this->startTime && $this->endTime) {
+            $duration = $this->endTime - $this->startTime;
+            return number_format($duration, 6);
+        }
+        return 0;
     }
 
+    /**
+     * return the last SQL query
+     * example: $sql = $db->sql();
+     * 
+     * @return string
+     */
+    public function sql()
+    {
+        return $this->sql;
+    }
+
+    /**
+     * return the PDO binds for the last query
+     * example: $binds = $db->binds();
+     * 
+     * @return array
+     */
+    public function binds()
+    {
+        return $this->binds;
+    }    
+
+
+    // -----------------------------------------------------------------------------
+    // Development / Debugging
+    // -----------------------------------------------------------------------------
 
     /**
      * display information about the last query
@@ -298,10 +445,8 @@ class DatabaseHelper
     }
 
     /**
-     * return a list of all tables in the database
-     * example: $tables = $db->tables();
-     *
-     * @return array
+     * output a list of all tables in the database
+     * example: $db->tables();
      */
     public function tables()
     {
@@ -310,15 +455,15 @@ class DatabaseHelper
 
         $this->sql = 'SHOW TABLES;';
 
-        return $this->makeQuery();
+        $tables = $this->makeQuery();
+        $this->display($tables);
     }
 
     /**
-     * return a list of all fields in a table
-     * example: $fields = $db->fields('customers');
+     * output a list of all fields in a table
+     * example: $db->fields('customers');
      * 
      * @param string $table
-     * @return array
      */
     public function fields($table)
     {
@@ -331,146 +476,15 @@ class DatabaseHelper
         }
 
         $this->sql = 'DESCRIBE `' . $table . '`;';
+        $fields = $this->makeQuery();
 
-        return $this->makeQuery();
-    }
-
-    /**
-     * set a configuration setting
-     * the setting name must exist in the $settings array
-     * the value must be valid for the specified setting
-     * example: $db->updateSetting('save_query_run_time', true);
-     * supports chaining: $db->updateSetting('save_query_run_time', true)->updateSetting('connection_error_action', 'exit');
-     * 
-     * @param string $setting
-     * @param mixed $value
-     * @return DatabaseHelper
-     */
-    public function updateSetting($setting, $value)
-    {
-        if (!isset($this->settings[$setting])) {
-            $this->exitProgramError("DatabaseHelper updateSetting() received invalid setting: " . $setting, true);
-            return $this;
-        }
-
-        // valid settings 
-        //      boolean = save_query_run_time, output_error_debugging, return_null_on_error, delete_and_update_require_where
-        //      integer = max_records_per_insert_query, max_rows_for_table_display
-        //      string = connection_error_action, query_error_action, error_output_html, id_field_name
-
-        if (
-            $setting === 'save_query_run_time' ||
-            $setting === 'output_error_debugging' ||
-            $setting === 'return_null_on_error' ||
-            $setting === 'delete_and_update_require_where'
-        ) {
-            if (empty($value) || $value === 'false') {
-                $value = false;
-            } else {
-                $value = true;
-            }
-        } elseif ($setting === 'max_records_per_insert_query' || $setting === 'max_rows_for_table_display') {
-            if (!is_numeric($value)) {
-                $this->exitProgramError("DatabaseHelper updateSetting() value must be a number: " . $setting, true);
-                return $this;
-            }
-            $value = intval($value);
-            
-            // upper limit set to 10k
-            if ($setting === 'max_records_per_insert_query' && ($value < 1 || $value > 10000)) {
-                $this->exitProgramError('value is invalid for setting: max_records_per_insert_query. value must be between 1 and 10,000', true);
-                return $this;
-            }
-        
-            // upper limit set to 10k
-            // lower limit set to 2. showing 1 row defeats the purpose and users could set 1 thinking that they're setting a boolean value
-            if ($setting === 'max_rows_for_table_display' && ($value < 2 || $value > 10000)) {
-                $this->exitProgramError('value is invalid for setting: max_rows_for_table_display. value must be between 2 and 10,000', true);
-                return $this;
-            }
-        } elseif ($setting === 'connection_error_action') {
-            // only valid values
-            if ($value !== 'exit' && $value !== 'continue_without_database') {
-                $this->exitProgramError('value is invalid for setting: connection_error_action. value must be "exit" or "continue_without_database"', true);
-                return $this;
-            }
-        } elseif ($setting === 'query_error_action') {
-            // only valid values
-            if ($value !== 'exit' && $value !== 'continue_without_database' && $value !== 'continue_with_database') {
-                $this->exitProgramError('value is invalid for setting: query_error_action. value must be "exit", "continue_without_database", or "continue_with_database"', true);
-                return $this;
-            }
-        } elseif ($setting === 'error_output_html') {
-            if (!is_string($value)) {
-                $this->exitProgramError('value is invalid for setting: error_output_html. value must be "string" (' . gettype($value) . ' passed)', true);
-                return $this;
-            }
-        } elseif ($setting === 'id_field_name') {
-            if (!is_string($value)) {
-                $this->exitProgramError('value is invalid for setting: id_field_name. value must be "string" (' . gettype($value) . ' passed)', true);
-                return $this;
-            }
-            $value = $this->checkIdentifier($value, 'id_field_name setting');
-            if (empty($value)) {
-                $this->exitProgramError('invalid id_field_name setting', true);
-                return $this;
-            }
-        } else {
-            // should not get here. this is just a failsafe in case a valid settings is not checked
-            $this->exitProgramError("DatabaseHelper updateSetting() setting not available: " . $setting, true);
-            return $this;
-        }
-
-        $this->settings[$setting] = $value;
-
-        return $this;
+        $this->display($fields);
     }
 
 
-    /**
-     * execute SQL when no result values are needed
-     * generally only needed for delete or update
-     * returns true if the query succeeds and false if it fails; 
-     *      success means the query executed without errors, not that any data was returned or changed
-     * example: $db->query('delete from customers where last_name = :last_name;', array(':last_name' => 'Jones'));
-     * 
-     * @param string $sql
-     * @param array $binds
-     * @return boolean
-     */
-    public function query($sql, $binds = array())
-    {
-        $this->resetInfo();
-        $this->returnType = 'query';
-        $this->sql = $sql;
-        $this->binds = $binds;
-
-        return $this->makeQuery();
-    }
-
-    /**
-     * return the number of rows in a table
-     * example: $totalUsers = $db->count('users');
-     *
-     * @param string $table
-     * @return int
-     */
-    public function count($table)
-    {
-        $this->resetInfo();
-        $this->returnType = 'one';
-
-        $returnInvalid = $this->getReturnInvalid();
-
-        $table = $this->checkIdentifier($table, 'count() table');
-        if (empty($table)) {
-            return $returnInvalid;
-        }
-
-        $this->sql = 'SELECT COUNT(*) AS `tot` FROM `' . $table . '`;';
-
-        return $this->makeQuery();
-    }
+    // -----------------------------------------------------------------------------
+    // Retrieve Data From Raw SQL
+    // -----------------------------------------------------------------------------
 
     /**
      * execute SQL and return all result rows
@@ -511,34 +525,6 @@ class DatabaseHelper
         $this->sql = $sql;
 
         $this->binds = $binds;
-
-        return $this->makeQuery();
-    }
-
-    /**
-     * get a row from a table using its identifier field (usually "id")
-     * returns a 1-dimensional associative array containing the row's fields and values
-     * uses the id_field_name setting to determine the identifier field
-     * runs query "select * from [table] where id=[id]"
-     * example: $customer = $db->rowById('customers', 25);
-     * 
-     * @param string $table
-     * @param int $id
-     * @return array
-     */
-    public function rowById($table, $id)
-    {
-        $this->resetInfo();
-        $this->returnType = 'row';
-
-        $table = $this->checkIdentifier($table, 'rowById() table');
-        $idFieldName = $this->checkIdentifier($this->settings['id_field_name'], 'rowById() id_field_name setting');
-        if (empty($table) || empty($idFieldName)) {
-            return $this->getReturnInvalid();
-        }
-
-        $this->sql = 'SELECT * FROM `' . $table . '` WHERE `' . $idFieldName . '` = :id limit 1;';
-        $this->binds = array(':id' => $id);
 
         return $this->makeQuery();
     }
@@ -611,6 +597,89 @@ class DatabaseHelper
         return $this->makeQuery();
     }
 
+
+    // -----------------------------------------------------------------------------
+    // Modify Database (Insert, Update, Delete, Alter, etc) From Raw SQL
+    // -----------------------------------------------------------------------------
+
+    /**
+     * execute SQL when no result values are needed
+     * generally only needed for delete or update
+     * returns true if the query succeeds and false if it fails; 
+     *      success means the query executed without errors, not that any data was returned or changed
+     * example: $db->query('delete from customers where last_name = :last_name;', array(':last_name' => 'Jones'));
+     * 
+     * @param string $sql
+     * @param array $binds
+     * @return boolean
+     */
+    public function query($sql, $binds = array())
+    {
+        $this->resetInfo();
+        $this->returnType = 'query';
+        $this->sql = $sql;
+        $this->binds = $binds;
+
+        return $this->makeQuery();
+    }
+
+
+    // -----------------------------------------------------------------------------
+    // Retrieve Data From Parameters (converted to SQL)
+    // -----------------------------------------------------------------------------
+
+    /**
+     * return the number of rows in a table
+     * example: $totalCustomers = $db->count('customers');
+     *
+     * @param string $table
+     * @return int
+     */
+    public function count($table)
+    {
+        $this->resetInfo();
+        $this->returnType = 'one';
+
+        $returnInvalid = $this->getReturnInvalid();
+
+        $table = $this->checkIdentifier($table, 'count() table');
+        if (empty($table)) {
+            return $returnInvalid;
+        }
+
+        $this->sql = 'SELECT COUNT(*) AS `tot` FROM `' . $table . '`;';
+
+        return $this->makeQuery();
+    }
+
+    /**
+     * get a row from a table using its identifier field (usually "id")
+     * returns a 1-dimensional associative array containing the row's fields and values
+     * uses the id_field_name setting to determine the identifier field
+     * runs query "select * from [table] where id=[id]"
+     * example: $customer = $db->rowById('customers', 25);
+     * 
+     * @param string $table
+     * @param int $id
+     * @return array
+     */
+    public function rowById($table, $id)
+    {
+        $this->resetInfo();
+        $this->returnType = 'row';
+
+        $table = $this->checkIdentifier($table, 'rowById() table');
+        $idFieldName = $this->checkIdentifier($this->settings['id_field_name'], 'rowById() id_field_name setting');
+        if (empty($table) || empty($idFieldName)) {
+            return $this->getReturnInvalid();
+        }
+
+        $this->sql = 'SELECT * FROM `' . $table . '` WHERE `' . $idFieldName . '` = :id limit 1;';
+        $this->binds = array(':id' => $id);
+
+        return $this->makeQuery();
+    }
+
     /**
      * get a single value from a table using its identifier field (usually "id")
      * returns a single value from the specified field
@@ -640,6 +709,11 @@ class DatabaseHelper
 
         return $this->makeQuery();
     }
+
+
+    // -----------------------------------------------------------------------------
+    // Modify Database (Insert, Update, Delete, Alter, etc) From Parameters (converted to SQL)
+    // -----------------------------------------------------------------------------    
 
     /**
      * insert a new row into a table
@@ -1144,12 +1218,17 @@ class DatabaseHelper
         return $this->makeQuery();
     }
 
+
+    // -----------------------------------------------------------------------------
+    // SQL Expression Helpers
+    // -----------------------------------------------------------------------------    
+
     /**
      * mark a value as raw SQL instead of a value to be bound
      * raw SQL is inserted directly into the query and is not protected by PDO binding
      * only use with SQL that is known to be safe
      * example: $db->raw('CURDATE()')
-     * full example: full example: $db->insert('users', array('username'=>'bob_jones', 'signup_date'=>$db->raw('CURDATE()')))
+     * full example: full example: $db->insert('users', array('username'=>'bob_jones', 'signup_date'=>$db->raw('CURDATE()')));
      *
      * @param string $value
      * @return array
@@ -1158,6 +1237,11 @@ class DatabaseHelper
     {
         return array('raw_sql' => $value);
     }
+
+    
+    // -----------------------------------------------------------------------------
+    // Internal Processing Functions (Queries)
+    // -----------------------------------------------------------------------------
 
     /**
      * prepare and execute SQL
@@ -1246,74 +1330,6 @@ class DatabaseHelper
         $this->querySuccessSave($statement);
 
         return $this->getReturnValue($statement);
-    }
-
-    /**
-     * after an error, set error information
-     * calls exitProgramError
-     * 
-     * @param PDOStatement $statement
-     */
-    private function queryErrorSave($statement)
-    {
-        $errorMsg = 'Query Failed';
-        if ($statement) {
-            $e  = $statement->errorInfo();
-            if (!empty($e)) {
-                $errorMsg = implode(' | ', $e);
-            }
-        } else {
-            $e = $this->connection->errorInfo();
-            if (!empty($e)) {
-                $errorMsg = implode(' | ', $e);
-            }
-        }
-        $this->exitProgramError($errorMsg);
-    }
-
-    /**
-     * after a successful query, save query information
-     * set isSuccess. set rowCount if applicable. set insertId if applicable
-     * 
-     * @param PDOStatement $statement
-     */
-    private function querySuccessSave($statement)
-    {
-        $this->isSuccess = true;
-        if ($statement) {
-            $rowCount = $statement->rowCount();
-            if (!empty($rowCount)) {
-                $this->rowCount = $rowCount;
-            }
-        }
-
-        $sqlFirst6Lc = strtolower(substr(trim($this->sql), 0, 6));
-        $type = $this->returnType;
-        if ($type === 'insert' || $type === 'insertMultiple' || $sqlFirst6Lc == 'insert') {
-            $this->insertId = $this->connection->lastInsertId();
-        }
-    }
-
-    /**
-     * check if a value is a raw SQL value created by the raw() 
-     * checks the array('raw_sql'=> $value) format generated by the raw() function
-     * returns the raw SQL string or false if the value is not a valid raw SQL value
-     *
-     * @param mixed $value
-     * @return string|false
-     */
-    private function getRawString($value)
-    {
-        if (!is_array($value)) {
-            return false;
-        }
-        if (count($value) != 1) {
-            return false;
-        }
-        if (!isset($value['raw_sql'])) {
-            return false;
-        }
-        return $value['raw_sql'];
     }
 
     /**
@@ -1432,6 +1448,104 @@ class DatabaseHelper
     }
 
     /**
+     * determine the value to return when a query fails or returns no results
+     * used internally by makeQuery() and getReturnValue()
+     * returns null for errors when the return_null_on_error setting is enabled
+     * otherwise returns a value based on the requested return type
+     * 
+     * @return mixed
+     */
+    private function getReturnInvalid()
+    {
+        $type = $this->returnType;
+
+        if ($type === 'query' || $type === 'insertMultiple') {
+            //  note that "query" and "insertMultiple" have boolean return values (success or fail). 
+            //      no need for them to be null even if return_null_on_error is set
+            return false;
+        }
+        if ($this->settings['return_null_on_error']) {
+            return null;
+        }
+        if ($type === 'one') {
+            return '';
+        }
+        if ($type === 'insert') {
+            return 0;
+        }
+
+        return array();
+    }
+
+    /**
+     * after an error, set error information
+     * calls exitProgramError
+     * 
+     * @param PDOStatement $statement
+     */
+    private function queryErrorSave($statement)
+    {
+        $errorMsg = 'Query Failed';
+        if ($statement) {
+            $e  = $statement->errorInfo();
+            if (!empty($e)) {
+                $errorMsg = implode(' | ', $e);
+            }
+        } else {
+            $e = $this->connection->errorInfo();
+            if (!empty($e)) {
+                $errorMsg = implode(' | ', $e);
+            }
+        }
+        $this->exitProgramError($errorMsg);
+    }
+
+    /**
+     * after a successful query, save query information
+     * set isSuccess. set rowCount if applicable. set insertId if applicable
+     * 
+     * @param PDOStatement $statement
+     */
+    private function querySuccessSave($statement)
+    {
+        $this->isSuccess = true;
+        if ($statement) {
+            $rowCount = $statement->rowCount();
+            if (!empty($rowCount)) {
+                $this->rowCount = $rowCount;
+            }
+        }
+
+        $sqlFirst6Lc = strtolower(substr(trim($this->sql), 0, 6));
+        $type = $this->returnType;
+        if ($type === 'insert' || $type === 'insertMultiple' || $sqlFirst6Lc == 'insert') {
+            $this->insertId = $this->connection->lastInsertId();
+        }
+    }
+
+    /**
+     * check if a value is a raw SQL value created by the raw() 
+     * checks the array('raw_sql'=> $value) format generated by the raw() function
+     * returns the raw SQL string or false if the value is not a valid raw SQL value
+     *
+     * @param mixed $value
+     * @return string|false
+     */
+    private function getRawString($value)
+    {
+        if (!is_array($value)) {
+            return false;
+        }
+        if (count($value) != 1) {
+            return false;
+        }
+        if (!isset($value['raw_sql'])) {
+            return false;
+        }
+        return $value['raw_sql'];
+    }
+
+    /**
      * check a database identifier such as a table or field name
      * should only contain letters, numbers, and underscores.
      * for binds, remove colon, check identifier, and put colon back. this will make sure that the colon will 
@@ -1478,37 +1592,6 @@ class DatabaseHelper
     }
 
     /**
-     * determine the value to return when a query fails or returns no results
-     * used internally by makeQuery() and getReturnValue()
-     * returns null for errors when the return_null_on_error setting is enabled
-     * otherwise returns a value based on the requested return type
-     * 
-     * @return mixed
-     */
-    private function getReturnInvalid()
-    {
-        $type = $this->returnType;
-
-        if ($type === 'query' || $type === 'insertMultiple') {
-            //  note that "query" and "insertMultiple" have boolean return values (success or fail). 
-            //      no need for them to be null even if return_null_on_error is set
-            return false;
-        }
-        if ($this->settings['return_null_on_error']) {
-            return null;
-        }
-        if ($type === 'one') {
-            return '';
-        }
-        if ($type === 'insert') {
-            return 0;
-        }
-
-        return array();
-    }
-
-
-    /**
      * reset information for the current database operation
      */
     private function resetInfo()
@@ -1530,7 +1613,101 @@ class DatabaseHelper
         }
     }
 
+    /**
+     * handle a database connection or query error.
+     * $isConnectionError is true for connection, initialization, or configuration errors
+     * end program (with optional output), continue without database, or continue with database based on settings
+     * see connection_error_action, query_error_action, error_output_html, and output_error_debugging settings
+     * 
+     * @param string $errorMessage
+     * @param boolean $isConnectionError
+     */
+    private function exitProgramError($errorMessage = '', $isConnectionError = false)
+    {
+        $endProgram = false;
+        if ($isConnectionError) {
+            $this->lastConnectionError = $errorMessage;
+            $this->skipQueries = true;
+            if ($this->settings['connection_error_action'] === 'continue_without_database') {
+                // continue
+            } else {
+                $endProgram = true;
+            }
+        } else {
+            $this->queryError = $this->lastQueryError = $errorMessage;
+            if ($this->settings['query_error_action'] === 'continue_with_database') {
+                // continue
+            } elseif ($this->settings['query_error_action'] === 'continue_without_database') {
+                $this->skipQueries = true;
+            } else {
+                $endProgram = true;
+            }
+        }
 
+        if (!$endProgram) {
+            return;
+        }
+
+        // output and end the program
+
+        $errorHtml = 'Database Error';
+        if (!empty($this->settings['error_output_html'])) {
+            $errorHtml = $this->settings['error_output_html'];
+        }
+        echo "\n\n<br>\n<br>\n<div>\n" . $errorHtml . "</div>";
+
+        if ($this->settings['output_error_debugging']) {
+            echo "\n\n<br>\n<br>\n<div>\n" . htmlentities($errorMessage) . "</div><br>\n\n";
+
+            if (!$isConnectionError) {
+                $this->displayLastQueryInfo();
+            }
+
+            echo "<br>\n\n";
+
+            $backtrace = debug_backtrace();
+            $backtraceData = array();
+            $databaseHelperFile = realpath(__FILE__);
+            foreach ($backtrace as $bt) {
+                $file = $line = $function = $class = $args = '';
+
+                if (!empty($bt['file'])) {
+                    $file = $bt['file'];
+                }
+
+                if (realpath($file) ==  $databaseHelperFile) {
+                    // filter out anything in the class itself (this file) 
+                    //continue;
+                }
+
+                if (!empty($bt['line'])) {
+                    $line = $bt['line'];
+                }
+                if (!empty($bt['class'])) {
+                    $class = $bt['class'];
+                }
+                if (!empty($bt['function'])) {
+                    $function = $bt['function'];
+                }
+
+
+                $backtraceData[] = array(
+                    'file' => $file,
+                    'line' =>  $line,
+                    'function' => $function,
+                    'class' => $class
+                );
+            }
+            $this->display($backtraceData);
+        }
+
+        die();
+    }
+
+
+    // -----------------------------------------------------------------------------
+    // Internal Processing Functions (Debugging Display)
+    // -----------------------------------------------------------------------------
 
     /**
      * display a value for debugging
@@ -1538,6 +1715,8 @@ class DatabaseHelper
      * displays arrays with matching row fields as an HTML table
      * recursively displays other arrays as HTML tables
      * uses var_dump for values that cannot be displayed as a table
+     * set up as a separate function from display() to avoid have 
+     *      the internal $isTopLevel parameter passed to the public display() function
      * 
      * @param mixed $value
      * @param boolean $isTopLevel
@@ -1644,97 +1823,5 @@ class DatabaseHelper
             echo "</td></tr>\n";
         }
         echo "</tbody></table>\n";
-    }
-
-
-    /**
-     * handle a database connection or query error.
-     * $isConnectionError is true for connection, initialization, or configuration errors
-     * end program (with optional output), continue without database, or continue with database based on settings
-     * see connection_error_action, query_error_action, error_output_html, and output_error_debugging settings
-     * 
-     * @param string $errorMessage
-     * @param boolean $isConnectionError
-     */
-    private function exitProgramError($errorMessage = '', $isConnectionError = false)
-    {
-        $endProgram = false;
-        if ($isConnectionError) {
-            $this->lastConnectionError = $errorMessage;
-            $this->skipQueries = true;
-            if ($this->settings['connection_error_action'] === 'continue_without_database') {
-                // continue
-            } else {
-                $endProgram = true;
-            }
-        } else {
-            $this->queryError = $this->lastQueryError = $errorMessage;
-            if ($this->settings['query_error_action'] === 'continue_with_database') {
-                // continue
-            } elseif ($this->settings['query_error_action'] === 'continue_without_database') {
-                $this->skipQueries = true;
-            } else {
-                $endProgram = true;
-            }
-        }
-
-        if (!$endProgram) {
-            return;
-        }
-
-        // output and end the program
-
-        $errorHtml = 'Database Error';
-        if (!empty($this->settings['error_output_html'])) {
-            $errorHtml = $this->settings['error_output_html'];
-        }
-        echo "\n\n<br>\n<br>\n<div>\n" . $errorHtml . "</div>";
-
-        if ($this->settings['output_error_debugging']) {
-            echo "\n\n<br>\n<br>\n<div>\n" . htmlentities($errorMessage) . "</div><br>\n\n";
-
-            if (!$isConnectionError) {
-                $this->displayLastQueryInfo();
-            }
-
-            echo "<br>\n\n";
-
-            $backtrace = debug_backtrace();
-            $backtraceData = array();
-            $databaseHelperFile = realpath(__FILE__);
-            foreach ($backtrace as $bt) {
-                $file = $line = $function = $class = $args = '';
-
-                if (!empty($bt['file'])) {
-                    $file = $bt['file'];
-                }
-
-                if (realpath($file) ==  $databaseHelperFile) {
-                    // filter out anything in the class itself (this file) 
-                    //continue;
-                }
-
-                if (!empty($bt['line'])) {
-                    $line = $bt['line'];
-                }
-                if (!empty($bt['class'])) {
-                    $class = $bt['class'];
-                }
-                if (!empty($bt['function'])) {
-                    $function = $bt['function'];
-                }
-
-
-                $backtraceData[] = array(
-                    'file' => $file,
-                    'line' =>  $line,
-                    'function' => $function,
-                    'class' => $class
-                );
-            }
-            $this->display($backtraceData);
-        }
-
-        die();
     }
 }

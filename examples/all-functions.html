@@ -14,7 +14,7 @@
 
     <h2>include the class file and initialize</h2>
 
-<code>
+    <code>
 // include the class file
 require_once('../DatabaseHelper.class.php');
 // initialize class
@@ -28,21 +28,268 @@ $db = new DatabaseHelper(
 
     <br><br><br>
 
-    <h2>updateSetting($setting, $value)</h2>
+    <hr><br>
+    <h2>Settings</h2><br>
+
+    <h3>updateSetting($setting, $value)</h3>
     <ul>
         <li>set a configuration setting</li>
         <li>the setting name must exist in the $settings array</li>
         <li>the value must be valid for the specified setting</li>
         <li>supports chaining</li>
     </ul>
-<code>
+    <code>
 $db->updateSetting('save_last_query_info', true);
 $db->updateSetting('output_errors', "An Error Occurred")->updateSetting('error_output_html', true);
 </code>
 
     <br><br><br>
 
-    <h2>query($sql, $binds = array())</h2>
+    <hr><br>
+    <h2>Get Last Error and Connection Info</h2><br>
+
+    <h3>lastError()</h3>
+    <ul>
+        <li>return the last (most recent) error</li>
+        <li>note that this is NOT the error from the last query</li>
+        <li>will include connection errors (connection and initialization) and query errors (pre check and query itself)
+        </li>
+    </ul>
+    <code>
+$lastError = $db->lastError();
+</code>
+
+    <br><br><br>
+
+    <h3>hasDbConnection()</h3>
+    <ul>
+        <li>return if a database connection has been made or not</li>
+    </ul>
+    <code>
+$hasDbConnection = $db->hasDbConnection();
+</code>
+
+    <br><br><br>
+
+    <hr><br>
+    <h2>Get Last Query Info</h2><br>
+
+
+
+    <h3>insertId()</h3>
+    <ul>
+        <li>get the identifier of the last query</li>
+        <li>will be 0 unless the last query was a successful insert</li>
+    </ul>
+    <code>
+ $id = $db->insertId();
+</code>
+
+    <br><br><br>
+
+    <h3>rowCount()</h3>
+    <ul>
+        <li>get the number of rows affected by the last query</li>
+    </ul>
+    <code>
+$rowCount = $db->rowCount();
+</code>
+
+    <br><br><br>
+
+    <h3>error()</h3>
+    <ul>
+        <li>get the error from the last query</li>
+        <li>note that this differs from the last error</li>
+    </ul>
+    <code>
+$errorText = $db->error();
+</code>
+
+    <br><br><br>
+
+    <h3>success()</h3>
+    <ul>
+        <li>return if the last query was successful</li>
+    </ul>
+    <code>
+$isSuccess = $db->success();
+</code>
+
+    <br><br><br>
+
+
+    <h3>duration()</h3>
+    <ul>
+        <li>return the duration of the last query in seconds</li>
+    </ul>
+    <code>
+$durationInSeconds = $db->duration();
+</code>
+
+    <br><br><br>
+
+
+    <h3>sql()</h3>
+    <ul>
+        <li>return the last SQL query</li>
+    </ul>
+    <code>
+$sql = $db->sql();
+</code>
+
+    <br><br><br>
+
+
+    <h3>binds()</h3>
+    <ul>
+        <li>return the PDO binds for the last query</li>
+    </ul>
+    <code>
+$binds = $db->binds();
+</code>
+
+
+
+    <br><br><br>
+
+    <hr><br>
+    <h2>Development / Debugging</h2><br>
+
+    <h3>displayLastQueryInfo()</h3>
+    <ul>
+        <li>display information about the last query</li>
+        <li>data includes: raw SQL, binds, duration, errors, etc</li>
+
+    </ul>
+    <code>
+$db->displayLastQueryInfo();
+</code>
+
+
+    <br><br><br>
+
+
+    <h3>info()</h3>
+    <ul>
+        <li>shortcut for displayLastQuery</li>
+    </ul>
+    <code>
+$db->info();
+</code>
+
+    <br><br><br>
+
+
+
+
+    <h3>display()</h3>
+    <ul>
+        <li>display a value for debugging</li>
+        <li>displays arrays as an HTML table to make query results easier to read</li>
+        <li>displays other values using PHP's var_dump() function</li>
+        <li>note that this function is not intended for displaying data in a website or web interface; it is intended to
+            be a quick way to view database results and other information while developing</li>
+    </ul>
+    <code>
+$db->display($customers);
+</code>
+
+    <br><br><br>
+
+
+    <h3>tables()</h3>
+    <ul>
+        <li>output a list of all tables in the database</li>
+    </ul>
+    <code>
+$db->tables();
+</code>
+
+    <br><br><br>
+
+
+    <h3>fields()</h3>
+    <ul>
+        <li>output a list of all fields in a table</li>
+    </ul>
+    <code>
+$db->fields('customers');
+</code>
+
+    <br><br><br>
+
+    <hr><br>
+    <h2>Retrieve Data From Raw SQL</h2><br>
+
+
+
+    <h3>all($sql, $binds = array(), $keyField = '')</h3>
+    <ul>
+        <li>execute SQL and return all result rows</li>
+        <li>returns a 2-dimensional array, with each row as an associative key/value array</li>
+        <li>optionally use $keyField to use a field as the array key. * note that array keys are required and unique, so
+            null or duplicate values may result in rows being overwritten or omitted.</li>
+    </ul>
+    <code>
+$customers = $db->all('select * from customers where last_name = :last_name;', array(':last_name' => 'Jones'), 'id'); 
+</code>
+
+    <br><br><br>
+
+
+    <h3>row($sql, $binds = array())</h3>
+    <ul>
+        <li>execute SQL and return the first result row</li>
+        <li>returns a 1-dimensional associative array containing the row's fields and values</li>
+    </ul>
+    <code>
+$customer = $db->row('select * from customers where last_name = :last_name order by first_name limit 1;', array(':last_name' => 'Jones')); 
+</code>
+
+    <br><br><br>
+
+    <h3>column($sql, $binds = array(), $keyField = '', $valueField = '')</h3>
+    <ul>
+        <li>execute SQL and return all values from a single column</li>
+        <li>optionally use $keyField to use a field as the array key. * note that array keys are required and unique, so
+            null or duplicate values may result in rows being overwritten or omitted.</li>
+        <li>optionally use $valueField to specify which field's values to return</li>
+    </ul>
+    <code>
+$customerNames = $db->column('select id, first_name from customers where last_name = :last_name order by first_name;', array(':last_name' => 'Jones'), 'id', 'first_name');
+</code>
+
+    <br><br><br>
+
+    <h3>col($sql, $binds = array(), $keyField = '', $valueField = '')</h3>
+    <ul>
+        <li>shortcut for the column function</li>
+    </ul>
+    <code>
+$customerNames = $db->col('select id, first_name from customers where last_name = :last_name order by first_name;', array(':last_name' => 'Jones'), 'id', 'first_name');
+</code>
+
+
+    <br><br><br>
+
+    <h3>one($sql, $binds = array(), $valueField = '')</h3>
+    <ul>
+        <li>shortcut for the column function</li>
+    </ul>
+    <code>
+$customerNames = $db->col('select id, first_name from customers where last_name = :last_name order by first_name;', array(':last_name' => 'Jones'), 'id', 'first_name');
+</code>
+
+
+    <br><br><br>
+
+
+    <hr><br>
+    <h2>Modify Database (Insert, Update, Delete, Alter, etc) From Raw SQL</h2><br>
+
+
+    <h3>query($sql, $binds = array())</h3>
     <ul>
         <li>execute SQL when no result values are needed</li>
         <li>generally only needed for delete or update</li>
@@ -50,46 +297,34 @@ $db->updateSetting('output_errors', "An Error Occurred")->updateSetting('error_o
         <li>returns true if the query succeeds and false if it fails;
             success means the query executed without errors, not that it returned results or changed any rows</li>
     </ul>
-<code>
+    <code>
 $db->query('delete from customers where last_name = :last_name;', array(':last_name' => 'Jones'));    
 </code>
 
     <br><br><br>
 
-    <h2>all($sql, $binds = array(), $keyField = '')</h2>
+
+    <hr><br>
+    <h2>Retrieve Data From Parameters (converted to SQL)</h2><br>
+
+    <h3>count($sql, $binds = array(), $keyField = '')</h3>
     <ul>
-        <li>execute SQL and return all result rows</li>
-        <li>returns a 2-dimensional array, with each row as an associative key/value array</li>
-        <li>optionally use $keyField to use a field as the array key. * note that array keys are required and unique, so null or duplicate values may result in rows being overwritten or omitted.</li>
+        <li>return the number of rows in a table</li>
     </ul>
-<code>
-$customers = $db->all('select * from customers where last_name = :last_name;', array(':last_name' => 'Jones'), 'id'); 
+    <code>
+$totalCustomers = $db->count('customers');
 </code>
 
     <br><br><br>
 
-
-    <h2>row($sql, $binds = array())</h2>
-    <ul>
-        <li>execute SQL and return the first result row</li>
-        <li>returns a 1-dimensional associative array containing the row's fields and values</li>
-    </ul>
-<code>
-$customer = $db->row('select * from customers where last_name = :last_name order by first_name limit 1;', array(':last_name' => 'Jones')); 
-</code>
-
-
-    <br><br><br>
-
-
-    <h2>rowById($table, $id)</h2>
+    <h3>rowById($table, $id)</h3>
     <ul>
         <li>get a row from a table using its identifier field (usually "id")</li>
         <li>returns a 1-dimensional associative array containing the row's fields and values</li>
         <li>uses the id_field_name setting to determine the identifier field</li>
         <li>runs query "select * from [table] where id=[id]"</li>
     </ul>
-<code>
+    <code>
 $customer = $db->rowById('customers', 25);
 </code>
 
@@ -97,56 +332,14 @@ $customer = $db->rowById('customers', 25);
     <br><br><br>
 
 
-    <h2>column($sql, $binds = array(), $keyField = '', $valueField = '')</h2>
-    <ul>
-        <li>execute SQL and return all values from a single column</li>
-        <li>optionally use $keyField to use a field as the array key. * note that array keys are required and unique, so null or duplicate values may result in rows being overwritten or omitted.</li>
-        <li>optionally use $valueField to specify which field's values to return</li>
-    </ul>
-<code>
-$customerNames = $db->column('select id, first_name from customers where last_name = :last_name order by first_name;', array(':last_name' => 'Jones'), 'id', 'first_name');
-</code>
-
-
-    <br><br><br>
-
-    <h2>col($sql, $binds = array(), $keyField = '', $valueField = '')</h2>
-    <ul>
-        <li>shortcut for the column function</li>
-    </ul>
-<code>
-$customerNames = $db->col('select id, first_name from customers where last_name = :last_name order by first_name;', array(':last_name' => 'Jones'), 'id', 'first_name');
-</code>
-
-
-
-    <br><br><br>
-
-
-    <h2>oneById($table, $id, $field)</h2>
+    <h3>oneById($table, $id, $field)</h3>
     <ul>
         <li>get a single value from a table using its identifier field (usually "id")</li>
         <li>returns a single value from the specified field</li>
         <li>uses the id_field_name setting to determine the identifier field</li>
         <li>runs query "select [field] from [table] where id=[id]"</li>
     </ul>
-<code>
-$firstName = $db->oneById('customers', 25, 'first_name');
-</code>
-
-
-
-    <br><br><br>
-
-
-    <h2>oneById($table, $id, $field)</h2>
-    <ul>
-        <li>get a single value from a table using its identifier field (usually "id")</li>
-        <li>returns a single value from the specified field</li>
-        <li>uses the id_field_name setting to determine the identifier field</li>
-        <li>runs query "select [field] from [table] where id=[id]"</li>
-    </ul>
-<code>
+    <code>
 $firstName = $db->oneById('customers', 25, 'first_name');
 </code>
 
@@ -154,20 +347,24 @@ $firstName = $db->oneById('customers', 25, 'first_name');
     <br><br><br>
 
 
-    <h2>insert($table, $fields)</h2>
+    <hr><br>
+    <h2>Modify Database (Insert, Update, Delete, Alter, etc) From Parameters (converted to SQL)</h2><br>
+
+
+    <h3>insert($table, $fields)</h3>
     <ul>
         <li>insert a new row into a table</li>
         <li>returns the identifier (id) of the newly inserted row</li>
         <li>uses the array keys as field names and the array values as field values</li>
     </ul>
-<code>
+    <code>
 $newCustomerId = $db->insert('customers', array('first_name' => 'John', 'last_name' => 'Jones'));
 </code>
 
     <br><br><br>
 
 
-    <h2>insertMultiple($table, $rows)</h2>
+    <h3>insertMultiple($table, $rows)</h3>
     <ul>
         <li>insert a new row into a table</li>
         <li>returns true if all rows are inserted successfully and false if any query fails</li>
@@ -177,7 +374,7 @@ $newCustomerId = $db->insert('customers', array('first_name' => 'John', 'last_na
             max_records_per_insert_query setting</li>
         <li>insert a new row into a table</li>
     </ul>
-<code>
+    <code>
 $isSuccess = $db->insertMultiple('customers', array(
     array('first_name' => 'John', 'last_name' => 'Jones'),
     array('first_name' => 'Susan', 'last_name' => 'Smith')
@@ -186,7 +383,7 @@ $isSuccess = $db->insertMultiple('customers', array(
 
     <br><br><br>
 
-    <h2>insertMultipleFieldsValues($table, $fields, $dataRows)</h2>
+    <h3>insertMultipleFieldsValues($table, $fields, $dataRows)</h3>
     <ul>
         <li>insert multiple new rows into a table using a separate array of field names</li>
         <li>returns true if all rows are inserted successfully and false if any query fails</li>
@@ -196,7 +393,7 @@ $isSuccess = $db->insertMultiple('customers', array(
         <li>splits the insert into multiple queries when the number of rows exceeds the
             max_records_per_insert_query setting</li>
     </ul>
-<code>
+    <code>
 $isSuccess = $db->insertMultipleFieldsValues(
     'customers', 
     array('first_name', 'last_name'), 
@@ -208,20 +405,20 @@ $isSuccess = $db->insertMultipleFieldsValues(
 </code>
 
 
-
     <br><br><br>
 
-    <h2>update($table, $values, $whereSql, $whereBinds = array())</h2>
+    <h3>update($table, $values, $whereSql, $whereBinds = array())</h3>
     <ul>
         <li>update rows in a table</li>
         <li>returns true if the query succeeds and false if it fails</li>
         <li>uses $values to specify the fields and values to update</li>
         <li>uses $whereSql to specify which rows to update</li>
-        <li>$whereSql is required to avoid mistakes; if all rows need to be updated, set $whereSql to "true" to match all
+        <li>$whereSql is required to avoid mistakes; if all rows need to be updated, set $whereSql to "true" to match
+            all
             rows.</li>
         <li>optionally use $whereBinds to bind values to the $whereSql statement</li>
     </ul>
-<code>
+    <code>
 $isSuccess = $db->update('customers', array('first_name' => 'John'), 'last_name = :last_name', array(':last_name' => 'Jones'));
 </code>
 
@@ -229,42 +426,27 @@ $isSuccess = $db->update('customers', array('first_name' => 'John'), 'last_name 
     <br><br><br>
 
 
-    <h2>updateById($table, $values, $id)</h2>
+    <h3>updateById($table, $values, $id)</h3>
     <ul>
         <li>update a row in a table using its identifier field (usually "id")</li>
         <li>returns true if the query succeeds and false if it fails</li>
         <li>uses the id_field_name setting to determine the identifier field</li>
     </ul>
-<code>
+    <code>
 $isSuccess = $db->updateById('customers', array('first_name' => 'John'), 25);
 </code>
 
 
     <br><br><br>
 
-    <h2>delete($table, $whereSql, $whereBinds = array())</h2>
-    <ul>
-        <li>delete rows from a table</li>
-        <li>returns true if the query succeeds and false if it fails</li>
-        <li>uses $whereSql to specify which rows to delete</li>
-        <li>$whereSql is required to avoid mistakes; if all rows need to be updated, set $whereSql to "true" to match all rows.</li>
-        <li>optionally use $whereBinds to bind values to the $whereSql statement</li>
-    </ul>
-<code>
-$isSuccess = $db->delete('customers', 'last_name = :last_name', array(':last_name' => 'Jones'));
-</code>
-
-
-    <br><br><br>
-
-    <h2>deleteById($table, $id)</h2>
+    <h3>deleteById($table, $id)</h3>
     <ul>
         <li>delete a row from a table using its identifier field (usually "id")</li>
         <li>returns true if the query succeeds and false if it fails</li>
         <li>uses the id_field_name setting to determine the identifier (id) field</li>
         <li>runs query "delete from [table] where id=[id]"</li>
     </ul>
-<code>
+    <code>
 $isSuccess = $db->deleteById('customers', 25);
 </code>
 
@@ -272,79 +454,52 @@ $isSuccess = $db->deleteById('customers', 25);
     <br><br><br>
 
 
-    <h2>lastRowCount()</h2>
+    <hr><br>
+    <h2>SQL Expression Helpers</h2><br>
+
+    <h3>raw($value)</h3>
     <ul>
-        <li>get the number of rows affected by the last query</li>
+        <li>mark a value as raw SQL instead of a value to be bound</li>
+        <li>raw SQL is inserted directly into the query and is not protected by PDO binding</li>
+        <li>only use with SQL that is known to be safe</li>
     </ul>
-<code>
-$rowCount = $db->lastRowCount();
+    <code>
+// use SQL expression to set the current date from the database
+$insertValues = array(
+    'username' => 'bob_jones', 
+    'signup_date' => $db->raw('CURDATE()'));
+$db->insert('customers', $insertValues);
+
+// today's date will be entered in the database for the signup_date of the new record.
+
+
+// AVOID THIS -------
+// note that if the raw function is not used, the program will literally try to enter "CURDATE()"
+$insertValues = array(
+    'username' => 'bob_jones', 
+    'signup_date' => 'CURDATE()');
+$db->insert('customers', $insertValues);
+
+// the query will literally try to enter "CURDATE()" as the date. 
+// This will NOT set the current date as intended. It will either return an error or 
+//      convert it to an empty/zero date, depending on the Database mode/settings.
+
+
+// AVOID THIS -------
+// note that this is not needed where raw SQL is already used
+$sql = 'select * from customers where signup_date=:signup_date';
+$binds = array(':signup_date' => $db->raw('CURDATE()'));
+$customersToday = $db->all($sql, $binds);
+
+// will correctly retrieve the array of customers added today (where signup_date  = the current date)
+
+// since we are already in raw sql, we can simply add "CURDATE()" directly into the $sql string
+// this is much simpler and clearer. it will return the same results
+$sql = 'select * from customers where signup_date=CURDATE()';
+$customersToday = $db->all($sql);
+
+// will correctly retrieve the same array of customers added today
 </code>
-
-
-    <br><br><br>
-
-    <h2>lastInsertId()</h2>
-    <ul>
-        <li>get the identifier of the last query</li>
-        <li>will be 0 unless the last query was a successful insert</li>
-    </ul>
-<code>
- $id = $db->lastInsertId();
-</code>
-
-    <br><br><br>
-
-    <h2>lastQueryInfo()</h2>
-    <ul>
-        <li>get information on the last SQL query executed</li>
-        <li>data includes: raw SQL, binds, duration, errors, etc</li>
-    </ul>
-<code>
- $info = $db->lastQueryInfo();
-</code>
-
-    <br><br><br>
-
-
-    <h2>displayLastQueryInfo()</h2>
-    <ul>
-        <li>display information about the last query</li>
-        <li>data includes: raw SQL, binds, duration, errors, etc</li>
-    </ul>
-<code>
-$db->displayLastQueryInfo();
-</code>
-
-    <br><br><br>
-
-
-
-    <h2>info()</h2>
-    <ul>
-        <li>shortcut for displayLastQueryInfo</li>
-    </ul>
-<code>
-$db->info();
-</code>
-
-    <br><br><br>
-
-
-    <h2>display()</h2>
-    <ul>
-        <li>display a value for debugging</li>
-        <li>displays arrays as an HTML table to make query results easier to read</li>
-        <li>displays other values using var_dump</li>
-    </ul>
-<code>
-$db->display($customer);
-</code>
-
-
-lastError
-hasDbConnection
-lastQuerySuccessful
-success
 
 
 </body>
