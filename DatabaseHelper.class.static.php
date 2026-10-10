@@ -447,7 +447,7 @@ class Db
     // get a row from a table where a specified field matches a value
     public static function rowWhereEqual($table, $field, $value)
     {
-        lf::resetInfo();
+        self::resetInfo();
         self::$returnType = 'row';
 
         $table = self::checkIdentifier($table, 'rowWhereEqual() table');
