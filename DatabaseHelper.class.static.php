@@ -444,6 +444,24 @@ class Db
         return self::makeQuery();
     }
 
+    // get a row from a table where a specified field matches a value
+    public static function rowWhereEqual($table, $field, $value)
+    {
+        lf::resetInfo();
+        self::$returnType = 'row';
+
+        $table = self::checkIdentifier($table, 'rowWhereEqual() table');
+        $field = self::checkIdentifier($field, 'rowWhereEqual() field');
+        if (empty($table) || empty($field)) {
+            return self::getReturnInvalid();
+        }
+
+        self::$sql = 'SELECT * FROM `' . $table . '` WHERE `' . $field . '` = :val limit 1;';
+        self::$binds = array(':val' => $value);
+
+        return self::makeQuery();
+    }
+
     // get a single value from a table using its identifier field (usually "id")
     public static function oneById($table, $id, $field)
     {

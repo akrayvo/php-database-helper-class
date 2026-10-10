@@ -442,6 +442,24 @@ class DatabaseHelper
         return $this->makeQuery();
     }
 
+    // get a row from a table where a specified field matches a value
+    public function rowWhereEqual($table, $field, $value)
+    {
+        $this->resetInfo();
+        $this->returnType = 'row';
+
+        $table = $this->checkIdentifier($table, 'rowWhereEqual() table');
+        $field = $this->checkIdentifier($field, 'rowWhereEqual() field');
+        if (empty($table) || empty($field)) {
+            return $this->getReturnInvalid();
+        }
+
+        $this->sql = 'SELECT * FROM `' . $table . '` WHERE `' . $field . '` = :val limit 1;';
+        $this->binds = array(':val' => $value);
+
+        return $this->makeQuery();
+    }
+
     // get a single value from a table using its identifier field (usually "id")
     public function oneById($table, $id, $field)
     {

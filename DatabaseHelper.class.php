@@ -102,7 +102,7 @@ class DatabaseHelper
     // errors - note that errors can come from the database itself for bad queries or from the class receiving invalid parameters
     // last (most recent) error connecting to the database. if set, database queries will be skipped because the database connection failed  
     private $lastConnectionError = '';
-    
+
     // last (most recent) error from a query. could be due to an invalid parameter passed or an error from the database 
     private $lastQueryError = '';
 
@@ -122,7 +122,7 @@ class DatabaseHelper
     private $startTime = 0;
     private $endTime = 0;
 
-    
+
     /**
      * constructor
      * connects to the database. sets the connection variable
@@ -678,6 +678,33 @@ class DatabaseHelper
 
         $this->sql = 'SELECT * FROM `' . $table . '` WHERE `' . $idFieldName . '` = :id limit 1;';
         $this->binds = array(':id' => $id);
+
+        return $this->makeQuery();
+    }
+
+    /**
+     * get a row from a table where a specified field matches a value
+     * runs query "select * from [table] where [field]=[value] limit 1"
+     * example: $employee = $db->rowWhereEqual('employees', 'ssn', '123-45-6789');
+     * 
+     * @param string $table
+     * @param string $field
+     * @param mixed $value
+     * @return array
+     */
+    public function rowWhereEqual($table, $field, $value)
+    {
+        $this->resetInfo();
+        $this->returnType = 'row';
+
+        $table = $this->checkIdentifier($table, 'rowWhereEqual() table');
+        $field = $this->checkIdentifier($field, 'rowWhereEqual() field');
+        if (empty($table) || empty($field)) {
+            return $this->getReturnInvalid();
+        }
+
+        $this->sql = 'SELECT * FROM `' . $table . '` WHERE `' . $field . '` = :val limit 1;';
+        $this->binds = array(':val' => $value);
 
         return $this->makeQuery();
     }

@@ -434,6 +434,7 @@ $db->updateSetting('output_error_debugging', true);
 ### Retrieve Data From Parameters (converted to SQL)
 * `count($table)` - return the number of rows in a table
 * `rowById($table, $id)` - get a row from a table using its identifier field (usually "id")
+* `rowWhereEqual($table, $field, $value)` - get a row from a table where a specified field matches a value
 * `oneById($table, $id, $field)` - get a single value from a table using its identifier field (usually "id")
 
 ### Modify Database (Insert, Update, Delete, Alter, etc) From Parameters (converted to SQL)
