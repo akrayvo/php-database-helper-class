@@ -332,6 +332,19 @@ $customer = $db->rowById('customers', 25);
     <br><br><br>
 
 
+    <h3>rowWhereEqual($table, $id)</h3>
+    <ul>
+        <li>get a row from a table where a specified field matches a value</li>
+        <li>runs query "select * from [table] where [field]=[value] limit 1"</li>
+    </ul>
+    <code>
+$employee = $db->rowWhereEqual('employees', 'ssn', '123-45-6789');
+</code>
+
+
+    <br><br><br>    
+
+
     <h3>oneById($table, $id, $field)</h3>
     <ul>
         <li>get a single value from a table using its identifier field (usually "id")</li>
